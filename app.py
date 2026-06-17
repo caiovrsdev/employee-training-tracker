@@ -52,6 +52,7 @@ def init_db():
     """)
     db.commit()
     db.close()
+init_db()
 
 def status_treinamento(data_aprovacao, data_realizacao, na):
     if na:
@@ -336,6 +337,5 @@ def exportar_excel(sigla):
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if __name__ == "__main__":
-    init_db()
     print("\n✅  Acesse: http://localhost:5000\n")
     app.run(debug=True, host="0.0.0.0", port=5000)
