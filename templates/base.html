@@ -79,4 +79,135 @@
   /* STATUS BADGES */
   .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .badge-green { background: #14532d55; color: var(--green); border: 1px solid #22c55e44; }
-  .badge-red   { background: #7f1d1d55; color: var(--red);   border: 1px solid #ef44
+  .badge-red   { background: #7f1d1d55; color: var(--red);   border: 1px solid #ef444444; }
+  .badge-gray  { background: #1e293b; color: var(--gray);    border: 1px solid var(--border); }
+  .badge-yellow{ background: #78350f55; color: var(--yellow); border: 1px solid #f59e0b44; }
+
+  /* FORMS */
+  .form-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 620px; }
+  .form-row { margin-bottom: 16px; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+  input[type=text], input[type=date], textarea, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px 12px; font-size: 14px; outline: none; transition: border .15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3a7ae0; }
+  .btn-outline { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+  .btn-outline:hover { background: var(--surface2); color: var(--text); }
+  .btn-danger { background: #7f1d1d55; color: var(--red); border: 1px solid #ef444444; }
+  .btn-danger:hover { background: #ef44441a; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-green { background: #14532d; color: var(--green); border: 1px solid #22c55e44; }
+  .btn-green:hover { background: #166534; }
+
+  /* TOP BAR */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+
+  /* SETOR TABLE */
+  .setor-table-wrap { overflow-x: auto; }
+  .setor-table { border-collapse: collapse; font-size: 12px; min-width: 600px; }
+  .setor-table th { background: var(--surface2); color: var(--text-dim); padding: 8px 10px; border: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  .setor-table td { border: 1px solid var(--border); padding: 6px 10px; vertical-align: middle; }
+  .setor-table tr:hover td { background: #ffffff08; }
+  .col-treino { min-width: 220px; }
+  .col-data { width: 130px; }
+  .col-status { width: 100px; text-align: center; }
+  input.date-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 4px 6px; font-size: 12px; width: 120px; }
+  input.date-input:focus { border-color: var(--accent); outline: none; }
+  .na-check { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); cursor: pointer; }
+  .na-check input { width: auto; cursor: pointer; }
+  .save-btn { background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .save-btn:hover { background: #3a7ae0; }
+  .saved-flash { font-size: 11px; color: var(--green); margin-left: 4px; display: none; }
+
+  /* ALERT */
+  .alert { padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+  .alert-info { background: #1e3a5f; border: 1px solid #4f8ef744; color: var(--accent); }
+
+  /* SETOR CHIPS */
+  .chip { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--text-dim); margin: 1px; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-brand">Controle de Treinamentos <span>Ecolyzer</span></div>
+  <a href="/" {% if request.endpoint=='index' %}class="active"{% endif %}>Dashboard</a>
+  <a href="/treinamentos" {% if request.endpoint in ['treinamentos','novo_treinamento','editar_treinamento'] %}class="active"{% endif %}>Lista Doc</a>
+  <a href="/colaboradores" {% if request.endpoint=='colaboradores' %}class="active"{% endif %}>Colaboradores</a>
+  <div class="nav-sep"></div>
+  <div class="nav-setores">
+    {% for s in all_setores %}
+    <a href="/setor/{{ s.sigla }}" {% if request.endpoint=='setor' and setor is defined and setor.sigla==s.sigla %}class="active"{% endif %}>{{ s.sigla }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="nav-search-container">
+    <input type="text" id="nav-search" class="nav-search-input" placeholder="Buscar colaborador por nome...">
+    <div id="nav-search-results" class="nav-search-results"></div>
+  </div>
+
+  <div class="nav-auth">
+    {% if current_user.is_authenticated %}
+      <span>{{ current_user.nome }}</span>
+      <a href="/logout" class="logout-btn">Sair</a>
+    {% else %}
+      <a href="/login">Entrar</a>
+    {% endif %}
+  </div>
+</nav>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<script>
+document.getElementById('nav-search').addEventListener('input', function(e) {
+    let q = e.target.value.trim();
+    let resultsDiv = document.getElementById('nav-search-results');
+    
+    if (q.length < 2) {
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    fetch(`/api/buscar-colaborador?q=${encodeURIComponent(q)}`)
+        .then(response => response.json())
+        .then(data => {
+            resultsDiv.innerHTML = '';
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<div style="padding: 10px; color: var(--text-dim); font-size: 12px; text-align: center;">Nenhum colaborador encontrado</div>';
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            
+            data.forEach(colab => {
+                let item = document.createElement('div');
+                item.className = 'search-item';
+                item.innerHTML = `<div><strong>${colab.nome}</strong></div> <span>${colab.sigla}</span>`;
+                
+                item.addEventListener('click', function() {
+                    // Manda direto para o setor aplicando a flag ?colab=ID do colaborador
+                    window.location.href = `/setor/${colab.sigla}?colab=${colab.id}`;
+                });
+                
+                resultsDiv.appendChild(item);
+            });
+            resultsDiv.style.display = 'block';
+        });
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target.id !== 'nav-search') {
+        document.getElementById('nav-search-results').style.display = 'none';
+    }
+});
+</script>
+</body>
+</html>
