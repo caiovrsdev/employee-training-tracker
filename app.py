@@ -290,14 +290,26 @@ def excluir_treinamento(tid):
 @app.route("/colaboradores")
 def colaboradores():
     db = get_db()
-    rows = db.execute("""
-        SELECT c.*, s.sigla, s.nome as setor_nome
-        FROM colaboradores c JOIN setores s ON s.id=c.setor_id
-        WHERE c.ativo=1 ORDER BY s.sigla, c.nome
-    """).fetchall()
+    # Captura o termo de pesquisa enviado pela barra de busca
+    pesquisa = request.args.get("busca_nome", "").strip()
+    
+    if pesquisa:
+        rows = db.execute("""
+            SELECT c.*, s.sigla, s.nome as setor_nome
+            FROM colaboradores c JOIN setores s ON s.id=c.setor_id
+            WHERE c.ativo=1 AND c.nome LIKE ?
+            ORDER BY s.sigla, c.nome
+        """, (f"%{pesquisa}%",)).fetchall()
+    else:
+        rows = db.execute("""
+            SELECT c.*, s.sigla, s.nome as setor_nome
+            FROM colaboradores c JOIN setores s ON s.id=c.setor_id
+            WHERE c.ativo=1 ORDER BY s.sigla, c.nome
+        """).fetchall()
+        
     setores = db.execute("SELECT * FROM setores ORDER BY sigla").fetchall()
     db.close()
-    return render_template("colaboradores.html", colaboradores=rows, setores=setores)
+    return render_template("colaboradores.html", colaboradores=rows, setores=setores, pesquisa=pesquisa)
 
 @app.route("/colaboradores/novo", methods=["POST"])
 @login_required
@@ -317,7 +329,6 @@ def excluir_colaborador(cid):
     db.commit(); db.close()
     flash("Colaborador desativado.", "ok")
     return redirect(url_for("colaboradores"))
-
 # ── SETORES ───────────────────────────────────────────────────────────────────
 
 @app.route("/setores/novo", methods=["POST"])
@@ -347,6 +358,11 @@ def setor(sigla):
     treinos = db.execute("SELECT * FROM treinamentos ORDER BY codigo").fetchall()
     treinos_setor = [t for t in treinos if sigla in [x.strip() for x in t["departamentos"].split(",")]]
 
+    # Captura o filtro de pesquisa por Sistema de Acesso (Código do Treinamento)
+    filtro_treino = request.args.get("busca_treino", "").strip().lower()
+    if filtro_treino:
+        treinos_setor = [t for t in treinos_setor if filtro_treino in t["codigo"].lower() or filtro_treino in (t["obs"] or "").lower()]
+
     matriz = []
     for t in treinos_setor:
         linha = {"treinamento": t, "cells": []}
@@ -365,7 +381,7 @@ def setor(sigla):
     db.close()
     destaque_colab = request.args.get("colab", type=int)
     return render_template("setor.html", setor=s, colabs=colabs, matriz=matriz,
-                           hoje=date.today().isoformat(), destaque_colab=destaque_colab)
+                           hoje=date.today().isoformat(), destaque_colab=destaque_colab, filtro_treino=filtro_treino)
 
 @app.route("/registro/salvar", methods=["POST"])
 @login_required
