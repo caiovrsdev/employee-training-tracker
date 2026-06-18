@@ -1,93 +1,158 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="topbar">
-  <div>
-    <span class="badge badge-blue" style="font-size: 14px; padding: 4px 12px; margin-bottom: 8px; display: inline-block;">Setor: {{ setor.sigla }}</span>
-    <h1>{{ setor.nome }}</h1>
-  </div>
-  <a href="/exportar//{{ setor.sigla }}" class="btn btn-green">Exportar Excel</a>
-</div>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Matriz do Setor - {{ setor.sigla }}</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 100%; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #1f4e79; padding-bottom: 10px; }
+        h1 { color: #1f4e79; margin: 0; }
+        
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block; }
+        .btn-primary { background: #1f4e79; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
 
-<div class="table-wrap">
-  <table class="setor-table" style="width: 100%;">
-    <thead>
-      <tr>
-        <th class="col-treino">Treinamento / Cód.</th>
-        {% for c in colabs %}
-        <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--accent);">{{ c.nome }}</th>
-        {% endfor %}
-      </tr>
-      <tr>
-        <th></th>
-        {% for _ in colabs %}
-        <th style="font-size: 10px; color: var(--text-dim);">Data Realiz.</th>
-        <th style="font-size: 10px; color: var(--text-dim); text-align: center;">Status</th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for linha in matriz %}
-      <tr>
-        <td>
-          <strong>{{ linha.treinamento.codigo }}</strong>
-          <div style="font-size: 10px; color: var(--text-dim);">Aprovado em: {{ linha.treinamento.data_aprovacao or '—' }}</div>
-        </td>
-        {% for cell in linha.cells %}
-        <td style="white-space: nowrap;">
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <input type="date" class="date-input" id="date-{{ cell.colab_id }}-{{ linha.treinamento.id }}" value="{{ cell.data or '' }}" {% if cell.na %}disabled{% endif %}>
-            <label class="na-check">
-              <input type="checkbox" id="na-{{ cell.colab_id }}-{{ linha.treinamento.id }}" {% if cell.na %}checked{% endif %} onchange="toggleNa('{{ cell.colab_id }}', '{{ linha.treinamento.id }}')"> NA
-            </label>
-          </div>
-        </td>
-        <td style="text-align: center;">
-          <span id="badge-{{ cell.colab_id }}-{{ linha.treinamento.id }}" class="badge {% if cell.status=='válido' %}badge-green{% elif cell.status=='não realizado' %}badge-red{% elif cell.status=='NA' %}badge-gray{% else %}badge-yellow{% endif %}">
-            {{ cell.status }}
-          </span>
-          <br>
-          <button class="save-btn" style="margin-top: 4px;" onclick="salvarRegistro('{{ cell.colab_id }}', '{{ linha.treinamento.id }}')">Salvar</button>
-          <span class="saved-flash" id="flash-{{ cell.colab_id }}-{{ linha.treinamento.id }}">✓</span>
-        </td>
-        {% endfor %}
-      </tr>
-      {% else %}
-      <tr><td colspan="{{ 1 + (colabs|length * 2) }}" style="text-align:center; padding: 24px; color: var(--text-dim);">Nenhum treinamento configurado para este setor. Vincule este setor no campo "Departamentos Aplicáveis" de algum treinamento.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .form-inline { display: flex; gap: 10px; align-items: center; }
+        .form-inline input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
 
-<script>
-function toggleNa(cid, tid) {
-  const chk = document.getElementById(`na-${cid}-${tid}`);
-  const inp = document.getElementById(`date-${cid}-${tid}`);
-  inp.disabled = chk.checked;
-  if(chk.checked) inp.value = '';
-}
+        /* Estilos da Matriz (Tabela) */
+        .table-responsive { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: center; font-size: 13px; }
+        
+        /* Cabeçalhos fixos à esquerda */
+        th.sticky-col, td.sticky-col { position: sticky; left: 0; background: white; z-index: 2; min-width: 180px; text-align: left; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
+        th.sticky-col { background: #1f4e79; color: white; z-index: 3; }
+        
+        th.header-blue { background: #1f4e79; color: white; }
+        .colab-header { writing-mode: vertical-rl; transform: rotate(180deg); padding: 15px 5px; min-width: 40px; text-align: left; }
 
-function salvarRegistro(cid, tid) {
-  const dateVal = document.getElementById(`date-${cid}-${tid}`).value;
-  const naVal = document.getElementById(`na-${cid}-${tid}`).checked;
-  
-  const formData = new FormData();
-  formData.append('colab_id', cid);
-  formData.append('treino_id', tid);
-  formData.append('data_realizacao', dateVal);
-  if(naVal) formData.append('na', '1');
+        /* Cores de Status */
+        .status-valido { background-color: #92D050 !important; color: #000; font-weight: bold; }
+        .status-pendente { background-color: #FFC7CE !important; color: #9C0006; font-weight: bold; }
+        .status-na { background-color: #D9D9D9 !important; color: #595959; font-weight: bold; }
+        .status-vazio { color: #adb5bd; }
 
-  fetch('/registro/salvar', {
-    method: 'POST',
-    body: formData
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.ok) {
-      const flash = document.getElementById(`flash-${cid}-${tid}`);
-      flash.style.display = 'inline';
-      setTimeout(() => { flash.style.display = 'none'; location.reload(); }, 800);
-    }
-  });
-}
-</script>
-{% endblock %}
+        /* Estilos da Célula Editável (Modal simplificado via prompt) */
+        .clickable-cell { cursor: pointer; transition: background 0.2s; }
+        .clickable-cell:hover { filter: brightness(0.9); }
+        .destaque { outline: 3px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Matriz de Treinamentos / Acessos: {{ setor.sigla }} - {{ setor.nome }}</h1>
+            <div>
+                <a href="{{ url_for('exportar_excel', sigla=setor.sigla) }}" class="btn btn-success">📊 Exportar Excel</a>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Voltar</a>
+            </div>
+        </header>
+
+        <div class="card">
+            <form method="GET" class="form-inline">
+                <input type="text" name="busca_treino" value="{{ filtro_treino or '' }}" placeholder="Filtrar linhas por Sistema de Acesso ou Código...">
+                <button type="submit" class="btn btn-primary">Filtrar Matriz</button>
+                {% if filtro_treino %}
+                    <a href="{{ url_for('setor', sigla=setor.sigla) }}" class="btn btn-secondary">Limpar Filtro</a>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="sticky-col" style="top: 0;">Sistemas de Acesso / Treinamentos</th>
+                        {% for c in colabs %}
+                        <th class="header-blue {% if destaque_colab == c.id %}destaque{% endif %}">
+                            <div class="colab-header">{{ c.nome }}</div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in matriz %}
+                    <tr>
+                        <td class="sticky-col">
+                            <strong>{{ linha.treinamento.codigo }}</strong>
+                            {% if linha.treinamento.obs %}
+                            <br><small style="color: #6c757d;">{{ linha.treinamento.obs }}</small>
+                            {% endif %}
+                        </td>
+                        
+                        {% for cell in linha.cells %}
+                            {% set cls = '' %}
+                            {% if cell.status == 'válido' %}{% set cls = 'status-valido' %}
+                            {% elif cell.status == 'não realizado' %}{% set cls = 'status-pendente' %}
+                            {% elif cell.status == 'NA' %}{% set cls = 'status-na' %}
+                            {% else %}{% set cls = 'status-vazio' %}{% endif %}
+                            
+                            <td class="clickable-cell {{ cls }}" 
+                                {% if current_user.is_authenticated %}
+                                onclick="editarRegistro('{{ cell.colab_id }}', '{{ linha.treinamento.id }}', '{{ cell.data or '' }}', {{ 'true' if cell.na else 'false' }})"
+                                title="Clique para atualizar o status"
+                                {% endif %}>
+                                {% if cell.na %}
+                                    NA
+                                {% else %}
+                                    {{ cell.data if cell.data else '—' }}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="{{ colabs|length + 1 }}" style="padding: 30px; color: #868e96;">
+                            Nenhum registro ou sistema encontrado para este filtro.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <script>
+        function editarRegistro(colabId, treinoId, dataAtual, isNa) {
+            let infoNa = isNa ? "Sim" : "Não";
+            let novaData = prompt("Digite a data de realização (AAAA-MM-DD) ou deixe em branco se não realizou:", dataAtual);
+            
+            if (novaData === null) return; // Cancelou o prompt
+            
+            let novoNa = confirm("Esse sistema/treinamento é Não Aplicável (NA) para este colaborador?");
+            
+            let formData = new FormData();
+            formData.append('colab_id', colabId);
+            formData.append('treino_id', treinoId);
+            formData.append('data_realizacao', novaData);
+            if (novoNa) {
+                formData.append('na', '1');
+            }
+
+            fetch('/registro/salvar', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.ok) {
+                    window.location.reload(); // Recarrega para computar os novos status visuais
+                } else {
+                    alert("Erro ao salvar o registro.");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erro de conexão com o servidor.");
+            });
+        }
+    </script>
+    {% endif %}
+</body>
+</html>
