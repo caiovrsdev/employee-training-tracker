@@ -21,7 +21,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
 
-  /* CABEÇALHO FIXO BLINDADO */
+  /* NAV TOTALMENTE ISOLADA POR BLOCOS */
   nav { 
     background: var(--surface); 
     border-bottom: 1px solid var(--border); 
@@ -31,25 +31,35 @@
     height: 56px; 
     position: sticky; 
     top: 0; 
-    z-index: 1000; 
+    z-index: 1000;
     gap: 16px;
   }
-  .nav-brand { font-weight: 700; font-size: 14px; color: var(--accent); white-space: nowrap; }
+  
+  /* Bloco 1: Logo */
+  .nav-brand { font-weight: 700; font-size: 14px; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
   .nav-brand span { color: var(--text-dim); font-weight: 400; }
   
+  /* Bloco 2: Links Principais */
   .nav-links { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-  nav a { color: var(--text-dim); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; transition: all .15s; white-space: nowrap; }
-  nav a:hover, nav a.active { background: var(--surface2); color: var(--text); }
+  .nav-links a { color: var(--text-dim); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; transition: all .15s; white-space: nowrap; }
+  .nav-links a:hover, .nav-links a.active { background: var(--surface2); color: var(--text); }
   
   .nav-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
   
-  /* CONTEINER EXCLUSIVO DOS SETORES - IMPEDE DE VAZAR PARA O HEAD */
-  .nav-setores { display: flex; gap: 6px; align-items: center; overflow-x: auto; flex: 1; max-width: 400px; }
-  .nav-setores::-webkit-scrollbar { height: 0; display: none; }
-  .nav-setores a { font-weight: 600; color: var(--accent); text-decoration: none; font-size: 13px; padding: 4px 8px; border-radius: 4px; }
-  .nav-setores a:hover, .nav-setores a.active { background: var(--surface2); color: var(--text); }
+  /* Bloco 3: Área exclusiva e isolada dos Setores (Bloqueia vazamento pro head) */
+  .nav-setores-container { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    overflow-x: auto; 
+    flex: 1; 
+    max-width: 480px; 
+  }
+  .nav-setores-container::-webkit-scrollbar { height: 0; display: none; }
+  .nav-setores-container a { font-weight: 600; color: var(--accent); text-decoration: none; font-size: 13px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; transition: all .15s; }
+  .nav-setores-container a:hover, .nav-setores-container a.active { background: var(--surface2); color: var(--text); }
 
-  /* BUSCA À DIREITA */
+  /* Bloco 4: Busca Fixa na Direita */
   .nav-search-container { position: relative; width: 240px; margin-left: auto; flex-shrink: 0; }
   .nav-search-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 12px; font-size: 13px; outline: none; transition: border-color .15s; }
   .nav-search-input:focus { border-color: var(--accent); }
@@ -59,12 +69,13 @@
   .search-item:hover { background: var(--surface2); }
   .search-item span { font-size: 10px; background: var(--surface2); color: var(--accent); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
 
+  /* Bloco 5: Autenticação */
   .nav-auth { display: flex; align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
   .nav-auth span { color: var(--text-dim); }
   .nav-auth a { padding: 6px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-weight: 600; text-decoration: none; color: var(--text); }
   .nav-auth a.logout-btn { color: var(--red); border-color: rgba(239, 68, 68, 0.2); }
 
-  /* COMPONENTES GERAIS */
+  /* ESTILOS GERAIS DE COMPONENTES REUTILIZÁVEIS */
   main { max-width: 1400px; margin: 0 auto; padding: 24px; }
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; }
   h1 { font-size: 22px; font-weight: 700; color: var(--text); }
@@ -102,7 +113,7 @@
   .d-card.green .d-num { color: var(--green); }
   .d-card.red .d-num { color: var(--red); }
   
-  /* STATUS DA MATRIZ */
+  /* STATUS MATRIZ */
   .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
   .status-badge.valido { background: rgba(34, 197, 94, 0.1); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.2); }
   .status-badge.pendente { background: rgba(239, 68, 68, 0.1); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.2); }
@@ -112,16 +123,19 @@
 </style>
 </head>
 <body>
+
 <nav>
   <div class="nav-brand">Controle de Treinamentos <span>Ecolyzer</span></div>
+  
   <div class="nav-links">
-    <a href="/" {% if request.endpoint=='index' or request.path == '/' %}class="active"{% endif %}>Dashboard</a>
+    <a href="/" {% if request.path == '/' or request.endpoint == 'index' %}class="active"{% endif %}>Dashboard</a>
     <a href="/treinamentos" {% if request.endpoint in ['treinamentos','novo_treinamento','editar_treinamento'] %}class="active"{% endif %}>Lista Doc</a>
     <a href="/colaboradores" {% if request.endpoint=='colaboradores' %}class="active"{% endif %}>Colaboradores</a>
   </div>
+  
   <div class="nav-sep"></div>
   
-  <div class="nav-setores">
+  <div class="nav-setores-container">
     {% if all_setores is defined and all_setores %}
       {% for s in all_setores %}
         <a href="/setor/{{ s.sigla }}" {% if setor is defined and setor.sigla == s.sigla %}class="active"{% endif %}>{{ s.sigla }}</a>
@@ -137,6 +151,7 @@
     <input type="text" id="nav-search" class="nav-search-input" placeholder="Buscar colaborador...">
     <div id="nav-search-results" class="nav-search-results"></div>
   </div>
+  
   <div class="nav-auth">
     {% if current_user.is_authenticated %}
       <span>{{ current_user.nome }}</span>
@@ -146,9 +161,11 @@
     {% endif %}
   </div>
 </nav>
+
 <main>
   {% block content %}{% endblock %}
 </main>
+
 <script>
 document.getElementById('nav-search').addEventListener('input', function(e) {
     let q = e.target.value.trim();
