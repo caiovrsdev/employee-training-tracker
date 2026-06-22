@@ -28,7 +28,32 @@
     </div>
 </div>
 
+<div class="card-box" style="background: transparent; border: none; padding: 0; margin-bottom: 24px;">
+    <h3>Matrizes por Departamento</h3>
+    <div class="sector-grid">
+        {% if all_setores is defined and all_setores %}
+            {% for s in all_setores %}
+                <a href="/setor/{{ s.sigla }}" class="sector-card">
+                    {{ s.sigla }}
+                    <span>Visualizar Matriz</span>
+                </a>
+            {% endfor %}
+        {% elif setores is defined and setores %}
+            {% for s in setores %}
+                <a href="/setor/{{ s.sigla }}" class="sector-card">
+                    {{ s.sigla }}
+                    <span>Visualizar Matriz</span>
+                </a>
+            {% endfor %}
+        {% else %}
+            <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); font-size: 13px; padding: 16px; border: 1px dashed var(--border); border-radius: 6px;">
+                Nenhum setor cadastrado. Vá em "Colaboradores" para criar um novo setor.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
 <div class="tip-box">
-    <strong>Dica:</strong> Adicione os treinamentos globais na aba <strong>Lista Doc</strong> para que eles se distribuam automaticamente entre seus respectivos setores.
+    <strong>Dica:</strong> Clique em um dos departamentos acima para acessar, auditar e exportar a planilha de controle de treinamentos específica do setor.
 </div>
 {% endblock %}
