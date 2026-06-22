@@ -4,14 +4,14 @@
 <div class="topbar">
     <h1>Matriz de Treinamentos / Acessos: {{ setor.sigla }} - {{ setor.nome }}</h1>
     <div style="display: flex; gap: 8px;">
-        <button onclick="window.print()" class="btn btn-success">Exportar PDF</button>
+        <a href="{{ url_for('exportar_excel', setor_id=setor.id) if url_for('exportar_excel', setor_id=setor.id) is defined else '#' }}" class="btn btn-success">Exportar Excel</a>
         <a href="/" class="btn">Voltar</a>
     </div>
 </div>
 
-<div class="card-box" style="margin-bottom: 16px;">
+<div class="card-box" style="margin-bottom: 20px;">
     <form method="GET" style="display: flex; gap: 10px; margin: 0;">
-        <input type="text" name="filtro" class="form-control" style="margin: 0;" placeholder="Filtrar linhas por Sistema de Acesso ou Código..." value="{{ request.args.get('filtro', '') }}">
+        <input type="text" name="filtro" class="form-control" style="margin: 0;" placeholder="Filtrar por nome do treinamento ou código..." value="{{ request.args.get('filtro', '') }}">
         <button type="submit" class="btn btn-primary">Filtrar Matriz</button>
     </form>
 </div>
@@ -20,10 +20,10 @@
     <table>
         <thead>
             <tr>
-                <th>Sistemas de Acesso / Treinamentos</th>
+                <th style="min-width: 280px;">Sistemas de Acesso / Treinamentos</th>
                 {% for colab in colaboradores_setor %}
-                <th style="text-align: center; min-width: 120px; border-left: 1px solid var(--border);">
-                    {{ colab.nome }}
+                <th style="text-align: center; min-width: 160px; border-left: 1px solid var(--border);">
+                    <div>{{ colab.nome }}</div>
                 </th>
                 {% endfor %}
             </tr>
@@ -31,17 +31,54 @@
         <tbody>
             {% for t in treinamentos_setor %}
             <tr>
-                <td><strong>{{ t.nome }}</strong></td>
+                <td>
+                    <div style="font-weight: 700; color: var(--text);">{{ t.nome }}</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
+                        Aprovação: {{ t.data_aprovacao if t.data_aprovacao else 'Não informada' }}
+                    </div>
+                </td>
+                
                 {% for colab in colaboradores_setor %}
-                <td style="text-align: center; border-left: 1px solid var(--border);">
-                    <span style="color: var(--text-dim); font-size: 11px;">Não Realizado</span>
+                <td style="text-align: center; border-left: 1px solid var(--border); vertical-align: middle;">
+                    
+                    {# Bloco de validação de datas dinâmicas vindo do banco de dados relacional #}
+                    {% set realizado = namespace(data=none, status='vazio') %}
+                    
+                    {% if matriz_dados is defined %}
+                        {% for registro in matriz_dados %}
+                            {% if registro.colaborador_id == colab.id and registro.treinamento_id == t.id %}
+                                {% set realizado.data = registro.data_realizacao %}
+                                {% if t.data_aprovacao and registro.data_realizacao %}
+                                    {% if registro.data_realizacao >= t.data_aprovacao %}
+                                        {% set realizado.status = 'valido' %}
+                                    {% else %}
+                                        {% set realizado.status = 'pendente' %}
+                                    {% endif %}
+                                {% elif registro.data_realizacao %}
+                                    {% set realizado.status = 'valido' %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if realizado.status == 'valido' %}
+                        <div class="status-badge valido">Válido</div>
+                        <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Realizado: {{ realizado.data }}</div>
+                    {% elif realizado.status == 'pendente' %}
+                        <div class="status-badge pendente">Reciclagem Pendente</div>
+                        <div style="font-size: 11px; color: var(--red); margin-top: 4px;">Desatualizado: {{ realizado.data }}</div>
+                    {% else %}
+                        <div class="status-badge vazio">Não Realizado</div>
+                        <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">--/--/----</div>
+                    {% endif %}
+
                 </td>
                 {% endfor %}
             </tr>
             {% else %}
             <tr>
-                <td colspan="{{ (colaboradores_setor|length) + 1 }}" style="text-align: center; color: var(--text-dim); padding: 24px;">
-                    Nenhum registro ou sistema encontrado para este filtro.
+                <td colspan="{{ (colaboradores_setor|length) + 1 }}" style="text-align: center; color: var(--text-dim); padding: 32px;">
+                    Nenhum treinamento aplicável encontrado para este setor.
                 </td>
             </tr>
             {% endfor %}
