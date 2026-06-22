@@ -23,7 +23,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
 
-  /* NAV REESTRUTURADA */
+  /* NAV TOTALMENTE REESTRUTURADA E BLINDADA */
   nav { 
     background: var(--surface); 
     border-bottom: 1px solid var(--border); 
@@ -33,118 +33,96 @@
     height: 56px; 
     position: sticky; 
     top: 0; 
-    z-index: 100; 
+    z-index: 1000; 
     gap: 12px;
   }
   .nav-brand { font-weight: 700; font-size: 15px; color: var(--accent); white-space: nowrap; }
   .nav-brand span { color: var(--text-dim); font-weight: 400; }
   
-  .nav-links { display: flex; align-items: center; gap: 4px; }
+  .nav-links { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
   nav a { color: var(--text-dim); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; transition: all .15s; white-space: nowrap; }
   nav a:hover, nav a.active { background: var(--surface2); color: var(--text); }
   
   .nav-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
   
-  /* Container dos setores controlado para não empurrar a busca */
+  /* Container dos setores limitado e isolado para não vazar pro head */
   .nav-setores { 
     display: flex; 
     gap: 4px; 
     flex-wrap: nowrap; 
     overflow-x: auto; 
-    flex: 1; 
-    max-width: 500px; /* Impede que os setores invadam o lado direito */
+    flex: 1;
+    max-width: 450px;
   }
-  .nav-setores::-webkit-scrollbar { height: 0; background: transparent; } /* Oculta barra de rolagem horrorosa */
+  .nav-setores::-webkit-scrollbar { height: 0; background: transparent; }
+  .nav-setores a { font-weight: 600; color: var(--accent); }
+  .nav-setores a:hover, .nav-setores a.active { background: var(--surface2); color: var(--text); }
 
-  /* CONTAINER DA BUSCA INTELIGENTE FIXADA À DIREITA */
+  /* CONTAINER DA BUSCA FIXADO À DIREITA */
   .nav-search-container { 
     position: relative; 
-    width: 260px; 
-    margin-left: auto; /* Empurra o bloco de busca e login obrigatoriamente para a direita */
+    width: 240px; 
+    margin-left: auto; 
     flex-shrink: 0;
   }
   .nav-search-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 12px; font-size: 13px; outline: none; transition: border .15s; }
   .nav-search-input:focus { border-color: var(--accent); }
   
-  .nav-search-results { position: absolute; top: 120%; left: 0; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); display: none; z-index: 9999; max-height: 220px; overflow-y: auto; }
-  .search-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+  .nav-search-results { position: absolute; top: 120%; left: 0; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); display: none; z-index: 9999; max-height: 250px; overflow-y: auto; }
+  .search-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
   .search-item:last-child { border-bottom: none; }
   .search-item:hover { background: var(--surface2); }
-  .search-item strong { color: var(--accent); }
-  .search-item span { font-size: 10px; background: var(--surface2); color: var(--text-dim); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
+  .search-item strong { color: var(--text); }
+  .search-item span { font-size: 10px; background: var(--surface2); color: var(--accent); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); font-weight: bold; }
 
-  /* AUTH PANEL */
   .nav-auth { display: flex; align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
   .nav-auth span { color: var(--text-dim); }
-  .nav-auth a { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-weight: 600; text-decoration: none; }
+  .nav-auth a { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-weight: 600; text-decoration: none; color: var(--text); }
   .nav-auth a.logout-btn { color: var(--red); border-color: rgba(239, 68, 68, 0.2); }
-  .nav-auth a.logout-btn:hover { background: rgba(239, 68, 68, 0.1); }
+
+  /* CARDS DASHBOARD (CLASSES DE CORES RESTAURADAS) */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; transition: transform 0.15s; }
+  .card:hover { transform: translateY(-2px); }
+  .card-num { font-size: 36px; font-weight: 800; line-height: 1; }
+  .card-label { font-size: 11px; color: var(--text-dim); margin-top: 8px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  
+  /* Cores explícitas solicitadas */
+  .card.white .card-num { color: var(--text); }
+  .card.green .card-num { color: var(--green); }
+  .card.red .card-num { color: var(--red); }
 
   /* LAYOUT */
   main { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
   h1 { font-size: 22px; font-weight: 700; margin-bottom: 20px; }
   h2 { font-size: 16px; font-weight: 600; margin-bottom: 14px; color: var(--text-dim); }
-
-  /* CARDS DASHBOARD */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 16px; margin-bottom: 32px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
-  .card-num { font-size: 36px; font-weight: 800; line-height: 1; }
-  .card-label { font-size: 12px; color: var(--text-dim); margin-top: 6px; text-transform: uppercase; letter-spacing: .05em; }
   
-  /* TABLE */
   .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th { background: var(--surface2); color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
   tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
   tbody tr:hover { background: var(--surface2); }
   td { padding: 10px 14px; vertical-align: middle; }
-  td.center { text-align: center; }
-
-  /* FORMS */
-  .form-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 620px; }
-  .form-row { margin-bottom: 16px; }
-  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
-  input[type=text], input[type=date], textarea, select {
-    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
-    border-radius: 6px; padding: 8px 12px; font-size: 14px; outline: none; transition: border .15s;
-  }
-  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-
-  /* TOP BAR */
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
-
-  /* ALERT */
-  .alert { padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
-  .alert-info { background: #1e3a5f; border: 1px solid #4f8ef744; color: var(--accent); }
-  .alert-danger { background: #4c1d1d; border: 1px solid #ef444444; color: var(--red); }
-
-  /* SETOR CHIPS */
-  .chip { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--text-dim); margin: 1px; }
 </style>
 </head>
 <body>
 <nav>
   <div class="nav-brand">Controle de Treinamentos <span>Ecolyzer</span></div>
-  
   <div class="nav-links">
     <a href="/" {% if request.endpoint=='index' %}class="active"{% endif %}>Dashboard</a>
     <a href="/treinamentos" {% if request.endpoint in ['treinamentos','novo_treinamento','editar_treinamento'] %}class="active"{% endif %}>Lista Doc</a>
     <a href="/colaboradores" {% if request.endpoint=='colaboradores' %}class="active"{% endif %}>Colaboradores</a>
   </div>
-
   <div class="nav-sep"></div>
-  
   <div class="nav-setores">
     {% for s in all_setores %}
     <a href="/setor/{{ s.sigla }}" {% if request.endpoint=='setor' and setor is defined and setor.sigla==s.sigla %}class="active"{% endif %}>{{ s.sigla }}</a>
     {% endfor %}
   </div>
-
   <div class="nav-search-container">
     <input type="text" id="nav-search" class="nav-search-input" placeholder="Buscar colaborador...">
     <div id="nav-search-results" class="nav-search-results"></div>
   </div>
-
   <div class="nav-auth">
     {% if current_user.is_authenticated %}
       <span>{{ current_user.nome }}</span>
@@ -154,24 +132,20 @@
     {% endif %}
   </div>
 </nav>
-
 <main>
   {% block content %}{% endblock %}
 </main>
-
 <script>
 document.getElementById('nav-search').addEventListener('input', function(e) {
     let q = e.target.value.trim();
     let resultsDiv = document.getElementById('nav-search-results');
-    
     if (q.length < 2) {
         resultsDiv.innerHTML = '';
         resultsDiv.style.display = 'none';
         return;
     }
-    
     fetch(`/api/buscar-colaborador?q=${encodeURIComponent(q)}`)
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
             resultsDiv.innerHTML = '';
             if (data.length === 0) {
@@ -179,22 +153,18 @@ document.getElementById('nav-search').addEventListener('input', function(e) {
                 resultsDiv.style.display = 'block';
                 return;
             }
-            
             data.forEach(colab => {
                 let item = document.createElement('div');
                 item.className = 'search-item';
                 item.innerHTML = `<div><strong>${colab.nome}</strong></div> <span>${colab.sigla}</span>`;
-                
                 item.addEventListener('click', function() {
                     window.location.href = `/setor/${colab.sigla}?colab=${colab.id}`;
                 });
-                
                 resultsDiv.appendChild(item);
             });
             resultsDiv.style.display = 'block';
         });
 });
-
 document.addEventListener('click', function(e) {
     if (e.target.id !== 'nav-search') {
         document.getElementById('nav-search-results').style.display = 'none';
