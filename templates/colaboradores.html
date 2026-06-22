@@ -1,86 +1,106 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Colaboradores e Setores</title>
-    <style>
-        body { background-color: #0d1117; color: #c9d1d9; font-family: sans-serif; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        h1, h3 { color: #58a6ff; }
-        .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 20px; margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        
-        input, select { background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 15px; }
-        button { background-color: #238636; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        button:hover { background-color: #2ea043; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
-        th { background-color: #161b22; color: #58a6ff; }
-        tr:hover { background-color: #1f242c; }
-        
-        .flash { padding: 10px; border-radius: 6px; margin-bottom: 15px; }
-        .flash.ok { background-color: rgba(56, 139, 253, 0.15); color: #58a6ff; border: 1px solid #388bfd; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for cat, msg in messages %}
-              <div class="flash {{ cat }}">{{ msg }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
+{% extends "base.html" %}
 
-        <div class="grid">
-            <div class="card">
-                <h3>+ Cadastrar Novo Setor</h3>
-                <form action="{{ url_for('novo_setor') }}" method="POST">
-                    <input type="text" name="sigla" placeholder="Sigla do Setor (Ex: TI)" required style="text-transform: uppercase;">
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; font-family: 'Segoe UI', system-ui, sans-serif;">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          <div class="alert {% if cat == 'ok' %}alert-info{% else %}alert-danger{% endif %}" style="margin-bottom: 20px;">
+            {{ msg }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="topbar" style="margin-bottom: 28px;">
+        <h1>Gestão de Colaboradores e Setores</h1>
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 32px;">
+        
+        <div class="form-box" style="max-width: 100%;">
+            <h2 style="color: var(--accent); margin-bottom: 16px;">+ Cadastrar Novo Setor</h2>
+            <form action="{{ url_for('novo_setor') }}" method="POST">
+                <div class="form-row">
+                    <label>Sigla do Setor</label>
+                    <input type="text" name="sigla" placeholder="Ex: TI, RH, QUAL" required style="text-transform: uppercase;">
+                </div>
+                <div class="form-row">
+                    <label>Nome do Setor</label>
                     <input type="text" name="nome" placeholder="Nome Completo do Setor" required>
-                    <button type="submit">Cadastrar Setor</button>
-                </form>
-            </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Cadastrar Setor</button>
+            </form>
+        </div>
 
-            <div class="card">
-                <h3>+ Cadastrar Novo Colaborador</h3>
-                <form action="{{ url_for('novo_colaborador') }}" method="POST">
-                    <input type="text" name="nome" placeholder="Nome do Colaborador" required>
+        <div class="form-box" style="max-width: 100%;">
+            <h2 style="color: var(--accent); margin-bottom: 16px;">+ Cadastrar Novo Colaborador</h2>
+            <form action="{{ url_for('novo_colaborador') }}" method="POST">
+                <div class="form-row">
+                    <label>Nome Completo</label>
+                    <input type="text" name="nome" placeholder="Nome do Funcionário" required>
+                </div>
+                <div class="form-row">
+                    <label>Setor Alocado</label>
                     <select name="setor_id" required>
-                        <option value="">Selecione o Setor correspondente...</option>
+                        <option value="">Selecione o Setor...</option>
                         {% for s in setores %}
                             <option value="{{ s.id }}">{{ s.sigla }} - {{ s.nome }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit">Cadastrar Colaborador</button>
-                </form>
-            </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Cadastrar Colaborador</button>
+            </form>
         </div>
 
-        <div class="card">
-            <h3>Lista de Colaboradores Cadastrados</h3>
+    </div>
+    {% endif %}
+
+    <div class="form-box" style="max-width: 100%; padding: 20px;">
+        <h2 style="margin-bottom: 16px;">Colaboradores Ativos no Sistema</h2>
+        
+        <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th>Nome</th>
-                        <th>Setor</th>
+                        <th>Nome do Colaborador</th>
+                        <th>Setor / Departamento</th>
+                        {% if current_user.is_authenticated %}
+                        <th style="text-align: center; width: 120px;">Ações</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for c in colaboradores %}
                     <tr>
-                        <td><strong>{{ c.nome }}</strong></td>
-                        <td>{{ c.sigla }} - {{ c.setor_nome }}</td>
+                        <td><strong style="color: var(--text);">{{ c.nome }}</strong></td>
+                        <td>
+                            <span class="chip" style="background: var(--surface2); color: var(--accent); font-weight: 600; border-color: var(--border);">
+                                {{ c.sigla }}
+                            </span> 
+                            <span style="color: var(--text-dim); margin-left: 6px;">- {{ c.setor_nome }}</span>
+                        </td>
+                        {% if current_user.is_authenticated %}
+                        <td class="center">
+                            <form action="{{ url_for('excluir_colaborador', cid=c.id) }}" method="POST" onsubmit="return confirm('Deseja realmente desativar este colaborador?');" style="margin: 0;">
+                                <button type="submit" class="btn btn-danger btn-sm">Desativar</button>
+                            </form>
+                        </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="2" style="color: #8b949e;">Nenhum colaborador ativo no sistema.</td>
+                        <td colspan="{{ 3 if current_user.is_authenticated else 2 }}" style="text-align: center; color: var(--text-dim); padding: 24px;">
+                            Nenhum colaborador ativo encontrado na base de dados.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-</body>
-</html>
+
+</div>
+{% endblock %}
