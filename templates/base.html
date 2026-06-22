@@ -23,20 +23,49 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
 
-  /* NAV */
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 8px; height: 56px; position: sticky; top: 0; z-index: 100; }
-  .nav-brand { font-weight: 700; font-size: 15px; color: var(--accent); margin-right: 16px; white-space: nowrap; }
+  /* NAV REESTRUTURADA */
+  nav { 
+    background: var(--surface); 
+    border-bottom: 1px solid var(--border); 
+    padding: 0 24px; 
+    display: flex; 
+    align-items: center; 
+    height: 56px; 
+    position: sticky; 
+    top: 0; 
+    z-index: 100; 
+    gap: 12px;
+  }
+  .nav-brand { font-weight: 700; font-size: 15px; color: var(--accent); white-space: nowrap; }
   .nav-brand span { color: var(--text-dim); font-weight: 400; }
+  
+  .nav-links { display: flex; align-items: center; gap: 4px; }
   nav a { color: var(--text-dim); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; transition: all .15s; white-space: nowrap; }
   nav a:hover, nav a.active { background: var(--surface2); color: var(--text); }
-  .nav-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
-  .nav-setores { display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto; }
-  .nav-setores::-webkit-scrollbar { height: 0; }
+  
+  .nav-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+  
+  /* Container dos setores controlado para não empurrar a busca */
+  .nav-setores { 
+    display: flex; 
+    gap: 4px; 
+    flex-wrap: nowrap; 
+    overflow-x: auto; 
+    flex: 1; 
+    max-width: 500px; /* Impede que os setores invadam o lado direito */
+  }
+  .nav-setores::-webkit-scrollbar { height: 0; background: transparent; } /* Oculta barra de rolagem horrorosa */
 
-  /* ESTILOS ADICIONADOS PARA A BARRA DE PESQUISA INTELIGENTE */
-  .nav-search-container { position: relative; width: 280px; margin-left: auto; margin-right: 10px; }
+  /* CONTAINER DA BUSCA INTELIGENTE FIXADA À DIREITA */
+  .nav-search-container { 
+    position: relative; 
+    width: 260px; 
+    margin-left: auto; /* Empurra o bloco de busca e login obrigatoriamente para a direita */
+    flex-shrink: 0;
+  }
   .nav-search-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 12px; font-size: 13px; outline: none; transition: border .15s; }
   .nav-search-input:focus { border-color: var(--accent); }
+  
   .nav-search-results { position: absolute; top: 120%; left: 0; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); display: none; z-index: 9999; max-height: 220px; overflow-y: auto; }
   .search-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
   .search-item:last-child { border-bottom: none; }
@@ -45,9 +74,9 @@
   .search-item span { font-size: 10px; background: var(--surface2); color: var(--text-dim); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
 
   /* AUTH PANEL */
-  .nav-auth { display: flex; align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; }
+  .nav-auth { display: flex; align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
   .nav-auth span { color: var(--text-dim); }
-  .nav-auth a { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-weight: 600; }
+  .nav-auth a { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-weight: 600; text-decoration: none; }
   .nav-auth a.logout-btn { color: var(--red); border-color: rgba(239, 68, 68, 0.2); }
   .nav-auth a.logout-btn:hover { background: rgba(239, 68, 68, 0.1); }
 
@@ -61,27 +90,15 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
   .card-num { font-size: 36px; font-weight: 800; line-height: 1; }
   .card-label { font-size: 12px; color: var(--text-dim); margin-top: 6px; text-transform: uppercase; letter-spacing: .05em; }
-  .card.green .card-num { color: var(--green); }
-  .card.red .card-num { color: var(--red); }
-  .card.blue .card-num { color: var(--accent); }
-  .card.gray .card-num { color: var(--gray); }
-
+  
   /* TABLE */
   .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th { background: var(--surface2); color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
   tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
-  tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: var(--surface2); }
   td { padding: 10px 14px; vertical-align: middle; }
   td.center { text-align: center; }
-
-  /* STATUS BADGES */
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-  .badge-green { background: #14532d55; color: var(--green); border: 1px solid #22c55e44; }
-  .badge-red   { background: #7f1d1d55; color: var(--red);   border: 1px solid #ef444444; }
-  .badge-gray  { background: #1e293b; color: var(--gray);    border: 1px solid var(--border); }
-  .badge-yellow{ background: #78350f55; color: var(--yellow); border: 1px solid #f59e0b44; }
 
   /* FORMS */
   .form-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 620px; }
@@ -92,43 +109,14 @@
     border-radius: 6px; padding: 8px 12px; font-size: 14px; outline: none; transition: border .15s;
   }
   input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-  textarea { resize: vertical; min-height: 70px; }
-
-  /* BUTTONS */
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all .15s; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: #3a7ae0; }
-  .btn-outline { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
-  .btn-outline:hover { background: var(--surface2); color: var(--text); }
-  .btn-danger { background: #7f1d1d55; color: var(--red); border: 1px solid #ef444444; }
-  .btn-danger:hover { background: #ef44441a; }
-  .btn-sm { padding: 4px 10px; font-size: 12px; }
-  .btn-green { background: #14532d; color: var(--green); border: 1px solid #22c55e44; }
-  .btn-green:hover { background: #166534; }
 
   /* TOP BAR */
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
 
-  /* SETOR TABLE */
-  .setor-table-wrap { overflow-x: auto; }
-  .setor-table { border-collapse: collapse; font-size: 12px; min-width: 600px; }
-  .setor-table th { background: var(--surface2); color: var(--text-dim); padding: 8px 10px; border: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
-  .setor-table td { border: 1px solid var(--border); padding: 6px 10px; vertical-align: middle; }
-  .setor-table tr:hover td { background: #ffffff08; }
-  .col-treino { min-width: 220px; }
-  .col-data { width: 130px; }
-  .col-status { width: 100px; text-align: center; }
-  input.date-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 4px 6px; font-size: 12px; width: 120px; }
-  input.date-input:focus { border-color: var(--accent); outline: none; }
-  .na-check { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); cursor: pointer; }
-  .na-check input { width: auto; cursor: pointer; }
-  .save-btn { background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
-  .save-btn:hover { background: #3a7ae0; }
-  .saved-flash { font-size: 11px; color: var(--green); margin-left: 4px; display: none; }
-
   /* ALERT */
   .alert { padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
   .alert-info { background: #1e3a5f; border: 1px solid #4f8ef744; color: var(--accent); }
+  .alert-danger { background: #4c1d1d; border: 1px solid #ef444444; color: var(--red); }
 
   /* SETOR CHIPS */
   .chip { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--text-dim); margin: 1px; }
@@ -137,10 +125,15 @@
 <body>
 <nav>
   <div class="nav-brand">Controle de Treinamentos <span>Ecolyzer</span></div>
-  <a href="/" {% if request.endpoint=='index' %}class="active"{% endif %}>Dashboard</a>
-  <a href="/treinamentos" {% if request.endpoint in ['treinamentos','novo_treinamento','editar_treinamento'] %}class="active"{% endif %}>Lista Doc</a>
-  <a href="/colaboradores" {% if request.endpoint=='colaboradores' %}class="active"{% endif %}>Colaboradores</a>
+  
+  <div class="nav-links">
+    <a href="/" {% if request.endpoint=='index' %}class="active"{% endif %}>Dashboard</a>
+    <a href="/treinamentos" {% if request.endpoint in ['treinamentos','novo_treinamento','editar_treinamento'] %}class="active"{% endif %}>Lista Doc</a>
+    <a href="/colaboradores" {% if request.endpoint=='colaboradores' %}class="active"{% endif %}>Colaboradores</a>
+  </div>
+
   <div class="nav-sep"></div>
+  
   <div class="nav-setores">
     {% for s in all_setores %}
     <a href="/setor/{{ s.sigla }}" {% if request.endpoint=='setor' and setor is defined and setor.sigla==s.sigla %}class="active"{% endif %}>{{ s.sigla }}</a>
@@ -148,7 +141,7 @@
   </div>
 
   <div class="nav-search-container">
-    <input type="text" id="nav-search" class="nav-search-input" placeholder="Buscar colaborador por nome...">
+    <input type="text" id="nav-search" class="nav-search-input" placeholder="Buscar colaborador...">
     <div id="nav-search-results" class="nav-search-results"></div>
   </div>
 
@@ -193,7 +186,6 @@ document.getElementById('nav-search').addEventListener('input', function(e) {
                 item.innerHTML = `<div><strong>${colab.nome}</strong></div> <span>${colab.sigla}</span>`;
                 
                 item.addEventListener('click', function() {
-                    // Manda direto para o setor aplicando a flag ?colab=ID do colaborador
                     window.location.href = `/setor/${colab.sigla}?colab=${colab.id}`;
                 });
                 
