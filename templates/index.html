@@ -1,48 +1,34 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div style="max-width: 1400px; margin: 0 auto;">
+<div class="topbar">
+    <h1>Dashboard Operacional</h1>
+</div>
 
-    <div class="topbar" style="margin-bottom: 28px;">
-        <div>
-            <h1 style="font-size: 24px; font-weight: 700; color: var(--text);">Dashboard Operacional</h1>
-            <p style="font-size: 13px; color: var(--text-dim); margin-top: 4px;">Visão geral da matriz de conformidade e treinamentos da Ecolyzer</p>
+<div class="cards">
+    <div class="d-card white">
+        <div class="d-num">
+            {{ total_treinamentos if total_treinamentos is defined else (total_docs if total_docs is defined else (treinamentos|length if treinamentos is defined else 0)) }}
         </div>
+        <div class="d-label">Treinamentos na Lista Doc</div>
     </div>
 
-    <div class="cards">
-        
-        <div class="card white">
-            <div class="card-num">
-                {{ total_treinamentos if total_treinamentos is defined else (total_docs if total_docs is defined else 0) }}
-            </div>
-            <div class="card-label">Treinamentos na Lista Doc</div>
+    <div class="d-card green">
+        <div class="d-num">
+            {{ total_validos if total_validos is defined else (validos if validos is defined else 0) }}
         </div>
-
-        <div class="card green">
-            <div class="card-num">
-                {{ total_validos if total_validos is defined else (validos if validos is defined else 0) }}
-            </div>
-            <div class="card-label">Registros Válidos (Concluídos)</div>
-        </div>
-
-        <div class="card red">
-            <div class="card-num">
-                {{ total_nao_realizados if total_nao_realizados is defined else (nao_realizados if nao_realizados is defined else 0) }}
-            </div>
-            <div class="card-label">Não Realizados / Pendentes</div>
-        </div>
-
+        <div class="d-label">Registros Válidos (Concluídos)</div>
     </div>
 
-    <div class="form-box" style="max-width: 100%; padding: 24px; background: var(--surface); border: 1px solid var(--border);">
-        <h2 style="color: var(--accent); margin-bottom: 8px; font-size: 16px;">Bem-vindo ao Controle de Treinamentos</h2>
-        <p style="font-size: 13px; color: var(--text-dim); line-height: 1.6;">
-            Utilize a barra de navegação superior para transitar entre a <strong>Lista Doc</strong> e a gestão de <strong>Colaboradores</strong>. 
-            Para gerenciar e aplicar datas de treinamentos específicas de um departamento, clique na sigla do setor correspondente no menu superior. 
-            Você também pode utilizar a nova barra de busca inteligente para localizar um funcionário rapidamente de qualquer tela.
-        </p>
+    <div class="d-card red">
+        <div class="d-num">
+            {{ total_nao_realizados if total_nao_realizados is defined else (nao_realizados if nao_realizados is defined else 0) }}
+        </div>
+        <div class="d-label">Não Realizados / Pendentes</div>
     </div>
+</div>
 
+<div class="tip-box">
+    <strong>Dica:</strong> Adicione os treinamentos globais na aba <strong>Lista Doc</strong> para que eles se distribuam automaticamente entre seus respectivos setores.
 </div>
 {% endblock %}
