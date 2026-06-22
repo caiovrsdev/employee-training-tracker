@@ -4,28 +4,29 @@
   <h1>Visão Geral</h1>
 </div>
 
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Dashboard Operacional</h1>
+
 <div class="cards">
-  <div class="card blue">
-    <div class="card-num">{{ total_treinos }}</div>
-    <div class="card-label">Treinamentos cadastrados</div>
-  </div>
-  <div class="card blue">
-    <div class="card-num">{{ total_colab }}</div>
-    <div class="card-label">Colaboradores ativos</div>
-  </div>
-  <div class="card green">
-    <div class="card-num">{{ contagem['válido'] }}</div>
-    <div class="card-label">Registros válidos</div>
-  </div>
-  <div class="card red">
-    <div class="card-num">{{ contagem['não realizado'] }}</div>
-    <div class="card-label">Não realizados / vencidos</div>
-  </div>
-  <div class="card gray">
-    <div class="card-num">{{ contagem['NA'] }}</div>
-    <div class="card-label">Não aplicáveis (NA)</div>
-  </div>
+    <div class="card white">
+        <div class="card-num">{{ total_treinamentos }}</div>
+        <div class="card-label">Treinamentos na Lista Doc</div>
+    </div>
+
+    <div class="card green">
+        <div class="card-num">{{ total_validos }}</div>
+        <div class="card-label">Registros Válidos (Concluídos)</div>
+    </div>
+
+    <div class="card red">
+        <div class="card-num">{{ total_nao_realizados }}</div>
+        <div class="card-label">Não Realizados / Pendentes</div>
+    </div>
 </div>
+
+{% endblock %}
 
 <h2>Setores</h2>
 <div class="cards">
