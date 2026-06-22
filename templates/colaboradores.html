@@ -1,103 +1,82 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container" style="max-width: 1200px; margin: 0 auto;">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-info">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for cat, msg in messages %}
-          <div class="alert {% if cat == 'ok' %}alert-info{% else %}alert-danger{% endif %}" style="margin-bottom: 20px;">
-            {{ msg }}
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+<div class="topbar">
+    <h1>Gestão de Colaboradores e Setores</h1>
+</div>
 
-    <div class="topbar" style="margin-bottom: 20px;">
-        <h1>Gestão de Colaboradores e Setores</h1>
+{% if current_user.is_authenticated %}
+<div class="grid-2">
+    <div class="card-box">
+        <h3>+ Cadastrar Novo Setor</h3>
+        <form action="{{ url_for('novo_setor') }}" method="POST">
+            <label>Sigla do Setor</label>
+            <input type="text" name="sigla" class="form-control" placeholder="Ex: TI" required style="text-transform: uppercase;">
+            <label>Nome do Setor</label>
+            <input type="text" name="nome" class="form-control" placeholder="Nome Completo do Setor" required>
+            <button type="submit" class="btn btn-primary">Cadastrar Setor</button>
+        </form>
     </div>
 
-    <div class="grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-        
-        <div class="card" style="background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;">
-            <h3 style="color: var(--accent); margin-bottom: 15px;">+ Cadastrar Novo Setor</h3>
-            <form action="{{ url_for('novo_setor') }}" method="POST">
-                <div class="form-row">
-                    <label>Sigla do Setor</label>
-                    <input type="text" name="sigla" placeholder="Sigla do Setor (Ex: TI)" required style="text-transform: uppercase;">
-                </div>
-                <div class="form-row">
-                    <label>Nome do Setor</label>
-                    <input type="text" name="nome" placeholder="Nome Completo do Setor" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Cadastrar Setor</button>
-            </form>
-        </div>
-
-        <div class="card" style="background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;">
-            <h3 style="color: var(--accent); margin-bottom: 15px;">+ Cadastrar Novo Colaborador</h3>
-            <form action="{{ url_for('novo_colaborador') }}" method="POST">
-                <div class="form-row">
-                    <label>Nome do Colaborador</label>
-                    <input type="text" name="nome" placeholder="Nome do Colaborador" required>
-                </div>
-                <div class="form-row">
-                    <label>Setor correspondente</label>
-                    <select name="setor_id" required>
-                        <option value="">Selecione o Setor correspondente...</option>
-                        {% for s in setores %}
-                            <option value="{{ s.id }}">{{ s.sigla }} - {{ s.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary">Cadastrar Colaborador</button>
-            </form>
-        </div>
-
+    <div class="card-box">
+        <h3>+ Cadastrar Novo Colaborador</h3>
+        <form action="{{ url_for('novo_colaborador') }}" method="POST">
+            <label>Nome do Colaborador</label>
+            <input type="text" name="nome" class="form-control" placeholder="Nome do Funcionário" required>
+            <label>Setor Correspondente</label>
+            <select name="setor_id" class="form-control" required>
+                <option value="">Selecione o Setor correspondente...</option>
+                {% for s in setores %}
+                    <option value="{{ s.id }}">{{ s.sigla }} - {{ s.nome }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">Cadastrar Colaborador</button>
+        </form>
     </div>
+</div>
+{% endif %}
 
-    <div class="card" style="background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;">
-        <h3 style="color: var(--text); margin-bottom: 15px;">Lista de Colaboradores Cadastrados</h3>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Setor</th>
-                        {% if current_user.is_authenticated %}
-                        <th style="width: 120px; text-align: center;">Ações</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in colaboradores %}
-                    <tr>
-                        <td><strong style="color: var(--text);">{{ c.nome }}</strong></td>
-                        <td>
-                            <span class="chip" style="background: var(--surface2); color: var(--accent); font-weight: 600; border-color: var(--border);">
-                                {{ c.sigla }}
-                            </span>
-                            <span style="color: var(--text-dim); margin-left: 6px;">- {{ c.setor_nome }}</span>
-                        </td>
-                        {% if current_user.is_authenticated %}
-                        <td class="center">
-                            <form action="{{ url_for('excluir_colaborador', cid=c.id) }}" method="POST" onsubmit="return confirm('Deseja realmente desativar este colaborador?');" style="margin: 0;">
-                                <button type="submit" class="btn btn-danger btn-sm">Desativar</button>
-                            </form>
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="{{ 3 if current_user.is_authenticated else 2 }}" style="text-align: center; color: var(--text-dim); padding: 24px;">
-                            Nenhum colaborador ativo no sistema.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<div class="card-box">
+    <h3>Lista de Colaboradores Cadastrados</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Setor</th>
+                    {% if current_user.is_authenticated %}
+                    <th style="width: 100px; text-align: center;">Ações</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in colaboradores %}
+                <tr>
+                    <td><strong>{{ c.nome }}</strong></td>
+                    <td><span class="chip">{{ c.sigla }}</span> - {{ c.setor_nome }}</td>
+                    {% if current_user.is_authenticated %}
+                    <td style="text-align: center;">
+                        <form action="{{ url_for('excluir_colaborador', cid=c.id) }}" method="POST" onsubmit="return confirm('Deseja desativar este colaborador?');" style="margin:0;">
+                            <button type="submit" class="btn btn-danger btn-sm">Desativar</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{{ 3 if current_user.is_authenticated else 2 }}" style="text-align: center; color: var(--text-dim);">Nenhum colaborador cadastrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
 </div>
 {% endblock %}
