@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash
-from flask_login import (LoginManager, UserMixin, login_user, logout_user,
-                          login_required, current_user)
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3, os
+import os
 from datetime import date, datetime
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
@@ -11,80 +11,74 @@ import io
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-key-troque-em-producao")
-DB = os.path.join(os.path.dirname(__file__), "treinamentos.db")
+
+# Configuração do banco de dados SQLite via SQLAlchemy
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'treinamentos.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 login_manager.login_message = "Faça login para acessar esta área."
 
-# ── DB ──────────────────────────────────────────────────────────────────────
+# ── MODELOS ORM (SQLAlchemy) ──────────────────────────────────────────────────
 
-def get_db():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-    return conn
+class Usuario(UserMixin, db.Model):
+    __tablename__ = 'usuarios'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False) # Mudado de 'login' para 'email' conforme novo HTML
+    senha_hash = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='gestor')
+    ativo = db.Column(db.Integer, default=1)
 
-def init_db():
-    db = get_db()
-    db.executescript("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            login TEXT NOT NULL UNIQUE,
-            senha_hash TEXT NOT NULL,
-            nome TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'gestor',
-            ativo INTEGER DEFAULT 1
-        );
-        CREATE TABLE IF NOT EXISTS setores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sigla TEXT NOT NULL UNIQUE,
-            nome TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS colaboradores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            setor_id INTEGER NOT NULL,
-            ativo INTEGER DEFAULT 1,
-            FOREIGN KEY (setor_id) REFERENCES setores(id)
-        );
-        CREATE TABLE IF NOT EXISTS treinamentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT NOT NULL,
-            departamentos TEXT NOT NULL,
-            sigla_doc TEXT,
-            data_aprovacao TEXT,
-            obs TEXT
-        );
-        CREATE TABLE IF NOT EXISTS registros (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            colaborador_id INTEGER NOT NULL,
-            treinamento_id INTEGER NOT NULL,
-            data_realizacao TEXT,
-            na INTEGER DEFAULT 0,
-            UNIQUE(colaborador_id, treinamento_id),
-            FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id),
-            FOREIGN KEY (treinamento_id) REFERENCES treinamentos(id)
-        );
-    """)
-    db.commit()
+class Setor(db.Model):
+    __tablename__ = 'setores'
+    id = db.Column(db.Integer, primary_key=True)
+    sigla = db.Column(db.String(10), unique=True, nullable=False)
+    nome = db.Column(db.String(100), nullable=False)
+    colaboradores = db.relationship('Colaborador', backref='setor', lazy=True)
 
-    # cria admin padrão na primeira execução, se não existir nenhum usuário
-    existe = db.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
-    if existe == 0:
-        senha_inicial = os.environ.get("ADMIN_SENHA_INICIAL", "admin123")
-        db.execute(
-            "INSERT INTO usuarios (login, senha_hash, nome, role) VALUES (?,?,?,?)",
-            ("admin", generate_password_hash(senha_inicial), "Administrador", "admin")
-        )
-        db.commit()
-        print(f"\n⚠️  Usuário admin criado. Login: admin / Senha: {senha_inicial}")
-        print("   Troque essa senha assim que possível em /usuarios\n")
+class Colaborador(db.Model):
+    __tablename__ = 'colaboradores'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    setor_id = db.Column(db.Integer, db.ForeignKey('setores.id'), nullable=False)
+    ativo = db.Column(db.Integer, default=1)
+    registros = db.relationship('Registro', backref='colaborador', cascade="all, delete-orphan", lazy=True)
 
-    db.close()
+class Treinamento(db.Model):
+    __tablename__ = 'treinamentos'
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(100), nullable=False) # Contém o código e nome ("IT-LAB-001...")
+    departamentos = db.Column(db.String(200), nullable=False)
+    sigla_doc = db.Column(db.String(50))
+    data_aprovacao = db.Column(db.String(20))
+    obs = db.Column(db.Text)
+    registros = db.relationship('Registro', backref='treinamento', cascade="all, delete-orphan", lazy=True)
 
-init_db()
+    # Propriedade dinâmica para compatibilidade com os templates que buscam .nome e .observacoes
+    @property
+    def nome(self):
+        return self.codigo
+    
+    @property
+    def observacoes(self):
+        return self.obs
 
+class Registro(db.Model):
+    __tablename__ = 'registros'
+    id = db.Column(db.Integer, primary_key=True)
+    colaborador_id = db.Column(db.Integer, db.ForeignKey('colaboradores.id'), nullable=False)
+    treinamento_id = db.Column(db.Integer, db.ForeignKey('treinamentos.id'), nullable=False)
+    data_realizacao = db.Column(db.String(20))
+    na = db.Column(db.Integer, default=0)
+    __table_args__ = (db.UniqueConstraint('colaborador_id', 'treinamento_id', name='_colab_treino_uc'),)
+
+# Helper de status
 def status_treinamento(data_aprovacao, data_realizacao, na):
     if na:
         return "NA"
@@ -99,54 +93,66 @@ def status_treinamento(data_aprovacao, data_realizacao, na):
     except:
         return "não realizado"
 
-# ── LOGIN (Flask-Login) ───────────────────────────────────────────────────────
-
-class Usuario(UserMixin):
-    def __init__(self, row):
-        self.id = row["id"]
-        self.login = row["login"]
-        self.nome = row["nome"]
-        self.role = row["role"]
-
 @login_manager.user_loader
 def load_user(user_id):
-    db = get_db()
-    row = db.execute("SELECT * FROM usuarios WHERE id=? AND ativo=1", (user_id,)).fetchone()
-    db.close()
-    return Usuario(row) if row else None
+    return Usuario.query.filter_by(id=int(user_id), ativo=1).first()
 
 @app.context_processor
 def inject_globals():
-    db = get_db()
-    all_setores = db.execute("SELECT * FROM setores ORDER BY sigla").fetchall()
-    db.close()
+    all_setores = Setor.query.order_by(Setor.sigla).all()
     return dict(all_setores=all_setores, current_user=current_user)
 
-@app.route("/login", methods=["GET", "POST"])
+# ── AUTENTICAÇÃO (API JSON & VIEWS) ───────────────────────────────────────────
+
+@app.route("/login")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
-    if request.method == "POST":
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM usuarios WHERE login=? AND ativo=1", (request.form["login"].strip(),)
-        ).fetchone()
-        db.close()
-        if row and check_password_hash(row["senha_hash"], request.form["senha"]):
-            login_user(Usuario(row))
-            next_url = request.args.get("next") or url_for("index")
-            return redirect(next_url)
-        flash("Login ou senha incorretos.", "error")
     return render_template("login.html")
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json() or {}
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+
+    user = Usuario.query.filter_by(email=email, ativo=1).first()
+    if user and check_password_hash(user.senha_hash, password):
+        login_user(user)
+        return jsonify({"ok": True, "redirect_url": url_for("index")})
+    
+    return jsonify({"error": "E-mail ou senha incorretos."}), 400
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    data = request.get_json() or {}
+    nome = data.get("name", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+
+    if not nome or not email or not password:
+        return jsonify({"error": "Preencha todos os campos."}), 400
+
+    if Usuario.query.filter_by(email=email).first():
+        return jsonify({"error": "Este e-mail já está cadastrado."}), 400
+
+    novo_usuario = Usuario(
+        nome=nome,
+        email=email,
+        senha_hash=generate_password_hash(password),
+        role='gestor'
+    )
+    db.session.add(novo_usuario)
+    db.session.commit()
+    return jsonify({"ok": True})
 
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("index"))
+    return redirect(url_for("login"))
 
-# ── GESTÃO DE USUÁRIOS (somente admin) ────────────────────────────────────────
-
+# Decorator Administrativo
 def admin_required(f):
     from functools import wraps
     @wraps(f)
@@ -157,104 +163,61 @@ def admin_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-@app.route("/usuarios")
-@admin_required
-def usuarios():
-    db = get_db()
-    rows = db.execute("SELECT * FROM usuarios WHERE ativo=1 ORDER BY nome").fetchall()
-    db.close()
-    return render_template("usuarios.html", usuarios=rows)
-
-@app.route("/usuarios/novo", methods=["POST"])
-@admin_required
-def novo_usuario():
-    db = get_db()
-    try:
-        db.execute(
-            "INSERT INTO usuarios (login, senha_hash, nome, role) VALUES (?,?,?,?)",
-            (request.form["login"].strip(), generate_password_hash(request.form["senha"]),
-             request.form["nome"].strip(), request.form["role"])
-        )
-        db.commit()
-        flash("Usuário criado com sucesso.", "ok")
-    except sqlite3.IntegrityError:
-        flash("Esse login já existe.", "error")
-    db.close()
-    return redirect(url_for("usuarios"))
-
-@app.route("/usuarios/<int:uid>/desativar", methods=["POST"])
-@admin_required
-def desativar_usuario(uid):
-    if uid == current_user.id:
-        flash("Você não pode desativar seu próprio usuário.", "error")
-        return redirect(url_for("usuarios"))
-    db = get_db()
-    db.execute("UPDATE usuarios SET ativo=0 WHERE id=?", (uid,))
-    db.commit(); db.close()
-    flash("Usuário desativado.", "ok")
-    return redirect(url_for("usuarios"))
-
-# ── ROUTES PRINCIPAIS (público) ────────────────────────────────────────────────
+# ── ROTAS OPERACIONAIS ────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    db = get_db()
-    setores = db.execute("SELECT * FROM setores ORDER BY sigla").fetchall()
-    total_treinos = db.execute("SELECT COUNT(*) FROM treinamentos").fetchone()[0]
-    total_colab   = db.execute("SELECT COUNT(*) FROM colaboradores WHERE ativo=1").fetchone()[0]
-    registros = db.execute("""
-        SELECT r.na, r.data_realizacao, t.data_aprovacao
-        FROM registros r JOIN treinamentos t ON t.id=r.treinamento_id
-    """).fetchall()
-    contagem = {"válido":0,"não realizado":0,"NA":0}
+    setores = Setor.query.order_by(Setor.sigla).all()
+    total_treinos = Treinamento.query.count()
+    total_colab = Colaborador.query.filter_by(ativo=1).count()
+    
+    registros = db.session.query(Registro.na, Registro.data_realizacao, Treinamento.data_aprovacao)\
+        .join(Treinamento, Treinamento.id == Registro.treinamento_id).all()
+        
+    contagem = {"válido": 0, "não realizado": 0, "NA": 0}
     for r in registros:
-        s = status_treinamento(r["data_aprovacao"], r["data_realizacao"], r["na"])
-        contagem[s] = contagem.get(s,0)+1
-    db.close()
-    return render_template("index.html", setores=setores,
-                           total_treinos=total_treinos, total_colab=total_colab,
-                           contagem=contagem)
-
-# ── BUSCA DE COLABORADOR (nav) ──────────────────────────────────────────────
+        s = status_treinamento(r.data_aprovacao, r.data_realizacao, r.na)
+        if s in contagem:
+            contagem[s] += 1
+            
+    return render_template("index.html", setores=setores, total_treinamentos=total_treinos, 
+                           total_validos=contagem["válido"], total_nao_realizados=contagem["não realizado"])
 
 @app.route("/api/buscar-colaborador")
 def buscar_colaborador():
     q = request.args.get("q", "").strip()
     if len(q) < 2:
         return jsonify([])
-    db = get_db()
-    rows = db.execute("""
-        SELECT c.id, c.nome, s.sigla, s.nome as setor_nome
-        FROM colaboradores c JOIN setores s ON s.id=c.setor_id
-        WHERE c.ativo=1 AND c.nome LIKE ?
-        ORDER BY c.nome LIMIT 12
-    """, (f"%{q}%",)).fetchall()
-    db.close()
+    
+    results = Colaborador.query.join(Setor).filter(
+        Colaborador.ativo == 1,
+        Colaborador.nome.like(f"%{q}%")
+    ).order_by(Colaborador.nome).limit(12).all()
+    
     return jsonify([
-        {"id": r["id"], "nome": r["nome"], "sigla": r["sigla"], "setor_nome": r["setor_nome"]}
-        for r in rows
+        {"id": r.id, "nome": r.nome, "sigla": r.setor.sigla, "setor_nome": r.setor.nome}
+        for r in results
     ])
-
-# ── TREINAMENTOS (Lista Doc) ──────────────────────────────────────────────────
 
 @app.route("/treinamentos")
 def treinamentos():
-    db = get_db()
-    rows = db.execute("SELECT * FROM treinamentos ORDER BY codigo").fetchall()
-    setores = db.execute("SELECT * FROM setores ORDER BY sigla").fetchall()
-    db.close()
+    rows = Treinamento.query.order_by(Treinamento.codigo).all()
+    setores = Setor.query.order_by(Setor.sigla).all()
     return render_template("treinamentos.html", treinamentos=rows, setores=setores)
 
 @app.route("/treinamentos/novo", methods=["GET","POST"])
 @login_required
 def novo_treinamento():
     if request.method == "POST":
-        db = get_db()
-        db.execute("INSERT INTO treinamentos (codigo,departamentos,sigla_doc,data_aprovacao,obs) VALUES (?,?,?,?,?)",
-            (request.form["codigo"], request.form["departamentos"],
-             request.form["sigla_doc"], request.form["data_aprovacao"] or None,
-             request.form["obs"]))
-        db.commit(); db.close()
+        t = Treinamento(
+            codigo=request.form["codigo"],
+            departamentos=request.form["departamentos"],
+            sigla_doc=request.form["sigla_doc"],
+            data_aprovacao=request.form["data_aprovacao"] or None,
+            obs=request.form["obs"]
+        )
+        db.session.add(t)
+        db.session.commit()
         flash("Treinamento cadastrado.", "ok")
         return redirect(url_for("treinamentos"))
     return render_template("form_treinamento.html", t=None)
@@ -262,167 +225,130 @@ def novo_treinamento():
 @app.route("/treinamentos/<int:tid>/editar", methods=["GET","POST"])
 @login_required
 def editar_treinamento(tid):
-    db = get_db()
+    t = Treinamento.query.get_or_404(tid)
     if request.method == "POST":
-        db.execute("UPDATE treinamentos SET codigo=?,departamentos=?,sigla_doc=?,data_aprovacao=?,obs=? WHERE id=?",
-            (request.form["codigo"], request.form["departamentos"],
-             request.form["sigla_doc"], request.form["data_aprovacao"] or None,
-             request.form["obs"], tid))
-        db.commit(); db.close()
+        t.codigo = request.form["codigo"]
+        t.departamentos = request.form["departamentos"]
+        t.sigla_doc = request.form["sigla_doc"]
+        t.data_aprovacao = request.form["data_aprovacao"] or None
+        t.obs = request.form["obs"]
+        db.session.commit()
         flash("Treinamento atualizado.", "ok")
         return redirect(url_for("treinamentos"))
-    t = db.execute("SELECT * FROM treinamentos WHERE id=?", (tid,)).fetchone()
-    db.close()
     return render_template("form_treinamento.html", t=t)
-
-@app.route("/treinamentos/<int:tid>/excluir", methods=["POST"])
-@login_required
-def excluir_treinamento(tid):
-    db = get_db()
-    db.execute("DELETE FROM registros WHERE treinamento_id=?", (tid,))
-    db.execute("DELETE FROM treinamentos WHERE id=?", (tid,))
-    db.commit(); db.close()
-    flash("Treinamento excluído.", "ok")
-    return redirect(url_for("treinamentos"))
-
-# ── COLABORADORES ─────────────────────────────────────────────────────────────
 
 @app.route("/colaboradores")
 def colaboradores():
-    db = get_db()
-    # Captura o termo de pesquisa enviado pela barra de busca
+    setores = Setor.query.order_by(Setor.sigla).all()
     pesquisa = request.args.get("busca_nome", "").strip()
     
     if pesquisa:
-        rows = db.execute("""
-            SELECT c.*, s.sigla, s.nome as setor_nome
-            FROM colaboradores c JOIN setores s ON s.id=c.setor_id
-            WHERE c.ativo=1 AND c.nome LIKE ?
-            ORDER BY s.sigla, c.nome
-        """, (f"%{pesquisa}%",)).fetchall()
+        colabs = Colaborador.query.join(Setor).filter(
+            Colaborador.ativo == 1, Colaborador.nome.like(f"%{pesquisa}%")
+        ).order_by(Setor.sigla, Colaborador.nome).all()
     else:
-        rows = db.execute("""
-            SELECT c.*, s.sigla, s.nome as setor_nome
-            FROM colaboradores c JOIN setores s ON s.id=c.setor_id
-            WHERE c.ativo=1 ORDER BY s.sigla, c.nome
-        """).fetchall()
+        colabs = Colaborador.query.join(Setor).filter(Colaborador.ativo == 1).order_by(Setor.sigla, Colaborador.nome).all()
         
-    setores = db.execute("SELECT * FROM setores ORDER BY sigla").fetchall()
-    db.close()
-    return render_template("colaboradores.html", colaboradores=rows, setores=setores, pesquisa=pesquisa)
+    # Adaptação para passar os objetos corretos esperados pelo template
+    colaboradores_adaptados = []
+    for c in colabs:
+        colaboradores_adaptados.append({
+            "id": c.id, "nome": c.nome, "sigla": c.setor.sigla, "setor_nome": c.setor.nome
+        })
+    return render_template("colaboradores.html", colaboradores=colaboradores_adaptados, setores=setores, pesquisa=pesquisa)
 
 @app.route("/colaboradores/novo", methods=["POST"])
 @login_required
 def novo_colaborador():
-    db = get_db()
-    db.execute("INSERT INTO colaboradores (nome, setor_id) VALUES (?,?)",
-               (request.form["nome"], request.form["setor_id"]))
-    db.commit(); db.close()
+    c = Colaborador(nome=request.form["nome"], setor_id=int(request.form["setor_id"]))
+    db.session.add(c)
+    db.session.commit()
     flash("Colaborador cadastrado.", "ok")
     return redirect(url_for("colaboradores"))
 
 @app.route("/colaboradores/<int:cid>/excluir", methods=["POST"])
 @login_required
 def excluir_colaborador(cid):
-    db = get_db()
-    db.execute("UPDATE colaboradores SET ativo=0 WHERE id=?", (cid,))
-    db.commit(); db.close()
+    c = Colaborador.query.get_or_404(cid)
+    c.ativo = 0
+    db.session.commit()
     flash("Colaborador desativado.", "ok")
     return redirect(url_for("colaboradores"))
-# ── SETORES ───────────────────────────────────────────────────────────────────
 
 @app.route("/setores/novo", methods=["POST"])
 @login_required
 def novo_setor():
-    db = get_db()
-    db.execute("INSERT OR IGNORE INTO setores (sigla, nome) VALUES (?,?)",
-               (request.form["sigla"].upper(), request.form["nome"]))
-    db.commit(); db.close()
-    flash("Setor cadastrado.", "ok")
+    sigla_up = request.form["sigla"].upper().strip()
+    if not Setor.query.filter_by(sigla=sigla_up).first():
+        s = Setor(sigla=sigla_up, nome=request.form["nome"].strip())
+        db.session.add(s)
+        db.session.commit()
+        flash("Setor cadastrado.", "ok")
     return redirect(url_for("colaboradores"))
 
-# ── SETOR DASHBOARD ───────────────────────────────────────────────────────────
+# ── DASHBOARD DO SETOR (RAIO-X CORRIGIDO) ─────────────────────────────────────
 
 @app.route("/setor/<sigla>")
 def setor(sigla):
-    db = get_db()
-    s = db.execute("SELECT * FROM setores WHERE sigla=?", (sigla,)).fetchone()
-    if not s:
-        db.close()
-        return "Setor não encontrado", 404
+    s = Setor.query.filter_by(sigla=sigla).first_or_404()
+    colabs = Colaborador.query.filter_by(setor_id=s.id, ativo=1).order_by(Colaborador.nome).all()
+    
+    todos_treinos = Treinamento.query.order_by(Treinamento.codigo).all()
+    treinos_setor = [t for t in todos_treinos if sigla in [x.strip() for x in t.departamentos.split(",")]]
+    
+    filtro = request.args.get("filtro", "").strip().lower()
+    if filtro:
+        treinos_setor = [t for t in treinos_setor if filtro in t.codigo.lower() or filtro in (t.obs or "").lower()]
+        
+    # Coleta todos os registros deste setor para a matriz de dados
+    colab_ids = [c.id for c in colabs]
+    registros_query = Registro.query.filter(Registro.colaborador_id.in_(colab_ids)).all() if colab_ids else []
 
-    colabs = db.execute(
-        "SELECT * FROM colaboradores WHERE setor_id=? AND ativo=1 ORDER BY nome", (s["id"],)
-    ).fetchall()
-
-    treinos = db.execute("SELECT * FROM treinamentos ORDER BY codigo").fetchall()
-    treinos_setor = [t for t in treinos if sigla in [x.strip() for x in t["departamentos"].split(",")]]
-
-    # Captura o filtro de pesquisa por Sistema de Acesso (Código do Treinamento)
-    filtro_treino = request.args.get("busca_treino", "").strip().lower()
-    if filtro_treino:
-        treinos_setor = [t for t in treinos_setor if filtro_treino in t["codigo"].lower() or filtro_treino in (t["obs"] or "").lower()]
-
-    matriz = []
-    for t in treinos_setor:
-        linha = {"treinamento": t, "cells": []}
-        for c in colabs:
-            reg = db.execute(
-                "SELECT * FROM registros WHERE colaborador_id=? AND treinamento_id=?",
-                (c["id"], t["id"])
-            ).fetchone()
-            if reg:
-                st = status_treinamento(t["data_aprovacao"], reg["data_realizacao"], reg["na"])
-                linha["cells"].append({"colab_id": c["id"], "data": reg["data_realizacao"], "na": reg["na"], "status": st, "reg_id": reg["id"]})
-            else:
-                linha["cells"].append({"colab_id": c["id"], "data": None, "na": False, "status": "—", "reg_id": None})
-        matriz.append(linha)
-
-    db.close()
-    destaque_colab = request.args.get("colab", type=int)
-    return render_template("setor.html", setor=s, colabs=colabs, matriz=matriz,
-                           hoje=date.today().isoformat(), destaque_colab=destaque_colab, filtro_treino=filtro_treino)
+    return render_template(
+        "setor.html", 
+        setor=s, 
+        colaboradores_setor=colabs,       # Corrigido conforme nome usado no setor.html
+        treinamentos_setor=treinos_setor,   # Corrigido conforme nome usado no setor.html
+        matriz_dados=registros_query,       # Corrigido conforme nome usado no setor.html
+        hoje=date.today().isoformat()
+    )
 
 @app.route("/registro/salvar", methods=["POST"])
 @login_required
 def salvar_registro():
-    db = get_db()
-    colab_id    = request.form["colab_id"]
-    treino_id   = request.form["treino_id"]
-    data_real   = request.form.get("data_realizacao") or None
-    na          = 1 if request.form.get("na") else 0
-    db.execute("""
-        INSERT INTO registros (colaborador_id, treinamento_id, data_realizacao, na)
-        VALUES (?,?,?,?)
-        ON CONFLICT(colaborador_id, treinamento_id)
-        DO UPDATE SET data_realizacao=excluded.data_realizacao, na=excluded.na
-    """, (colab_id, treino_id, data_real, na))
-    db.commit(); db.close()
+    colab_id = int(request.form["colab_id"])
+    treino_id = int(request.form["treino_id"])
+    data_real = request.form.get("data_realizacao") or None
+    na = 1 if request.form.get("na") else 0
+    
+    reg = Registro.query.filter_by(colaborador_id=colab_id, treinamento_id=treino_id).first()
+    if reg:
+        reg.data_realizacao = data_real
+        reg.na = na
+    else:
+        reg = Registro(colaborador_id=colab_id, treinamento_id=treino_id, data_realizacao=data_real, na=na)
+        db.session.add(reg)
+        
+    db.session.commit()
     return jsonify({"ok": True})
 
-# ── EXPORTAR EXCEL (público) ───────────────────────────────────────────────────
+# ── EXPORTAR EXCEL CONFORME MODELO ───────────────────────────────────────────
 
-@app.route("/exportar/<sigla>")
-def exportar_excel(sigla):
-    db = get_db()
-    s = db.execute("SELECT * FROM setores WHERE sigla=?", (sigla,)).fetchone()
-    if not s:
-        db.close()
-        return "Setor não encontrado", 404
-    colabs = db.execute(
-        "SELECT * FROM colaboradores WHERE setor_id=? AND ativo=1 ORDER BY nome", (s["id"],)
-    ).fetchall()
-    treinos = db.execute("SELECT * FROM treinamentos ORDER BY codigo").fetchall()
-    treinos_setor = [t for t in treinos if sigla in [x.strip() for x in t["departamentos"].split(",")]]
+@app.route("/setor/<int:sid>/exportar")
+def exportar_excel(sid):
+    s = Setor.query.get_or_404(sid)
+    colabs = Colaborador.query.filter_by(setor_id=s.id, ativo=1).order_by(Colaborador.nome).all()
+    todos_treinos = Treinamento.query.order_by(Treinamento.codigo).all()
+    treinos_setor = [t for t in todos_treinos if s.sigla in [x.strip() for x in t.departamentos.split(",")]]
 
     wb = Workbook()
     ws = wb.active
-    ws.title = sigla
+    ws.title = s.sigla
 
-    verde    = PatternFill("solid", fgColor="92D050")
+    verde = PatternFill("solid", fgColor="92D050")
     vermelho = PatternFill("solid", fgColor="FFC7CE")
-    cinza    = PatternFill("solid", fgColor="D9D9D9")
-    azul_h   = PatternFill("solid", fgColor="1F4E79")
+    cinza = PatternFill("solid", fgColor="D9D9D9")
+    azul_h = PatternFill("solid", fgColor="1F4E79")
 
     bold_w = Font(bold=True, color="FFFFFF")
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -438,7 +364,7 @@ def exportar_excel(sigla):
     col = 6
     for c in colabs:
         ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col+1)
-        cell = ws.cell(row=1, column=col, value=c["nome"])
+        cell = ws.cell(row=1, column=col, value=c.nome)
         cell.font = bold_w; cell.fill = azul_h; cell.alignment = center
         col += 2
 
@@ -456,20 +382,17 @@ def exportar_excel(sigla):
 
     for idx, t in enumerate(treinos_setor, 1):
         row = idx + 2
-        vals = [idx, t["codigo"], t["departamentos"], t["sigla_doc"], t["data_aprovacao"] or ""]
+        vals = [idx, t.codigo, t.departamentos, t.sigla_doc, t.data_aprovacao or ""]
         for ci, v in enumerate(vals, 1):
             cell = ws.cell(row=row, column=ci, value=v)
             cell.alignment = center; cell.border = border
 
         col = 6
         for c in colabs:
-            reg = db.execute(
-                "SELECT * FROM registros WHERE colaborador_id=? AND treinamento_id=?",
-                (c["id"], t["id"])
-            ).fetchone()
+            reg = Registro.query.filter_by(colaborador_id=c.id, treinamento_id=t.id).first()
             if reg:
-                st = status_treinamento(t["data_aprovacao"], reg["data_realizacao"], reg["na"])
-                data_val = reg["data_realizacao"] if not reg["na"] else "NA"
+                st = status_treinamento(t.data_aprovacao, reg.data_realizacao, reg.na)
+                data_val = reg.data_realizacao if not reg.na else "NA"
                 st_val = st
             else:
                 data_val = ""; st_val = "—"; st = "—"
@@ -478,6 +401,7 @@ def exportar_excel(sigla):
             dc.alignment = center; dc.border = border
             sc = ws.cell(row=row, column=col+1, value=st_val)
             sc.alignment = center; sc.border = border
+            
             if st == "válido": sc.fill = verde
             elif st == "não realizado": sc.fill = vermelho
             elif st == "NA": sc.fill = cinza
@@ -494,13 +418,26 @@ def exportar_excel(sigla):
         ws.column_dimensions[get_column_letter(col+1)].width = 16
         col += 2
 
-    db.close()
     buf = io.BytesIO()
     wb.save(buf); buf.seek(0)
-    fname = f"Treinamentos_{sigla}_{date.today()}.xlsx"
+    fname = f"Treinamentos_{s.sigla}_{date.today()}.xlsx"
     return send_file(buf, as_attachment=True, download_name=fname,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+# Inicialização do Banco com Admin Padrão
+with app.app_context():
+    db.create_all()
+    if Usuario.query.count() == 0:
+        senha_inicial = os.environ.get("ADMIN_SENHA_INICIAL", "admin123")
+        admin = Usuario(
+            nome="Administrador",
+            email="admin@empresa.com", # Usando e-mail padrão do sistema
+            senha_hash=generate_password_hash(senha_inicial),
+            role="admin"
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print(f"\n⚠️ Usuário admin criado. E-mail: admin@empresa.com / Senha: {senha_inicial}\n")
+
 if __name__ == "__main__":
-    print("\n✅  Acesse: http://localhost:5000\n")
     app.run(debug=True, host="0.0.0.0", port=5000)
