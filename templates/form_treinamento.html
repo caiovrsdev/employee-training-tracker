@@ -2,39 +2,34 @@
 {% block content %}
 <div class="topbar">
   <h1>{{ 'Editar Treinamento' if t else 'Novo Treinamento' }}</h1>
-  <a href="/treinamentos" class="btn btn-outline">Voltar para Lista</a>
+  <a href="/treinamentos" class="btn">Voltar para Lista</a>
 </div>
 
-<div class="form-box">
+<div class="card-box" style="max-width: 800px; margin: 0 auto;">
   <form method="POST">
-    <div class="form-row">
-      <label>Código / Nome do Treinamento</label>
-      <input type="text" name="codigo" value="{{ t.codigo if t else '' }}" required placeholder="Ex: IT-LAB-001 - Manuseio de Vidraria">
-    </div>
     
-    <div class="form-row">
-      <label>Departamentos Aplicáveis (Separados por vírgula)</label>
-      <input type="text" name="departamentos" value="{{ t.departamentos if t else '' }}" required placeholder="Ex: LAB, QUAL, ADM">
-      <small style="color: var(--text-dim); font-size: 11px; display: block; margin-top: 4px;">Escreva as siglas exatas dos setores separadas por vírgula.</small>
-    </div>
+    <label>Código / Nome do Treinamento</label>
+    <input type="text" name="codigo" class="form-control" value="{{ t.codigo if t else '' }}" required placeholder="Ex: IT-LAB-001 - Manuseio de Vidraria">
+    
+    <label>Departamentos Aplicáveis (Separados por vírgula)</label>
+    <input type="text" name="departamentos" class="form-control" style="margin-bottom: 4px;" value="{{ t.departamentos if t else '' }}" required placeholder="Ex: LAB, QUAL, ADM">
+    <small style="color: var(--text-dim); font-size: 11px; display: block; margin-bottom: 14px;">Escreva as siglas exatas dos setores separadas por vírgula.</small>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-      <div class="form-row">
+    <div class="grid-2" style="margin-bottom: 0;">
+      <div>
         <label>Sigla do Documento (Opcional)</label>
-        <input type="text" name="sigla_doc" value="{{ t.sigla_doc if t else '' }}" placeholder="Ex: DOC-01">
+        <input type="text" name="sigla_doc" class="form-control" value="{{ t.sigla_doc if t else '' }}" placeholder="Ex: DOC-01">
       </div>
-      <div class="form-row">
+      <div>
         <label>Data de Aprovação (Opcional)</label>
-        <input type="date" name="data_aprovacao" value="{{ t.data_aprovacao if t else '' }}">
+        <input type="date" name="data_aprovacao" class="form-control" value="{{ t.data_aprovacao if t else '' }}">
       </div>
     </div>
 
-    <div class="form-row">
-      <label>Observações</label>
-      <textarea name="obs" placeholder="Alguma observação relevante sobre a revisão ou conteúdo...">{{ t.obs if t else '' }}</textarea>
-    </div>
+    <label>Observações</label>
+    <textarea name="obs" class="form-control" rows="4" style="resize: vertical;" placeholder="Alguma observação relevante sobre a revisão ou conteúdo...">{{ t.obs if t else '' }}</textarea>
 
-    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 12px;">
+    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
       {{ 'Salvar Alterações' if t else 'Cadastrar Treinamento' }}
     </button>
   </form>
