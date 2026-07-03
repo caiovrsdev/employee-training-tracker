@@ -44,20 +44,18 @@
                 {% if colaboradores_setor is defined and colaboradores_setor %}
                     {% for colab in colaboradores_setor %}
                     
-                    {% set realizado_data = none %}
-                    {% set status_calculado = 'vazio' %}
-                    {% set is_na = 0 %}
+                    {# O USO DO NAMESPACE RESOLVE O "BUG INVISÍVEL" DO JINJA #}
+                    {% set ns = namespace(realizado_data=none, status_calculado='vazio', is_na=0) %}
                     
                     {% if matriz_dados is defined and matriz_dados %}
                         {% for registro in matriz_dados %}
                             {% if registro.colaborador_id == colab.id and registro.treinamento_id == t.id %}
-                                {% set is_na = registro.na %}
+                                {% set ns.is_na = registro.na %}
                                 {% if registro.na == 1 %}
-                                    {% set status_calculado = 'na' %}
+                                    {% set ns.status_calculado = 'na' %}
                                 {% else %}
-                                    {% set realizado_data = registro.data_realizacao %}
-                                    {# Chama a função direto do backend para não haver divergência de cálculo #}
-                                    {% set status_calculado = status_treinamento(t.data_aprovacao, registro.data_realizacao, registro.na) %}
+                                    {% set ns.realizado_data = registro.data_realizacao %}
+                                    {% set ns.status_calculado = status_treinamento(t.data_aprovacao, registro.data_realizacao, registro.na) %}
                                 {% endif %}
                             {% endif %}
                         {% endfor %}
@@ -67,16 +65,16 @@
                         class="matrix-cell" 
                         data-colab-id="{{ colab.id }}" 
                         data-treino-id="{{ t.id }}"
-                        data-current-date="{{ realizado_data if realizado_data else '' }}"
-                        data-current-na="{{ is_na }}">
+                        data-current-date="{{ ns.realizado_data if ns.realizado_data else '' }}"
+                        data-current-na="{{ ns.is_na }}">
                         
-                        {% if status_calculado == 'válido' %}
+                        {% if ns.status_calculado == 'válido' %}
                             <div class="status-badge valido" style="color: #ffffff !important;">Válido</div>
-                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">{{ realizado_data }}</div>
-                        {% elif status_calculado == 'pendente' %}
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">{{ ns.realizado_data }}</div>
+                        {% elif ns.status_calculado == 'pendente' %}
                             <div class="status-badge pendente" style="color: #ffffff !important;">Pendente</div>
-                            <div style="font-size: 11px; color: var(--red); margin-top: 4px;">Reciclagem: {{ realizado_data }}</div>
-                        {% elif status_calculado == 'na' %}
+                            <div style="font-size: 11px; color: var(--red); margin-top: 4px;">Reciclagem: {{ ns.realizado_data }}</div>
+                        {% elif ns.status_calculado == 'na' %}
                             <div class="status-badge" style="background: var(--border); color: var(--text-dim);">NA</div>
                             <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Não Aplicável</div>
                         {% else %}
