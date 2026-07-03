@@ -11,7 +11,6 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ── CONFIGURAÇÕES GERAIS ──────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-key-troque-em-producao")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.abspath(os.path.dirname(__file__)), 'treinamentos.db')}"
@@ -22,7 +21,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = "login"
 login_manager.login_message = "Faça login para acessar esta área."
 
-# ── MODELOS ORM (SQLAlchemy) ──────────────────────────────────────────────────
+# ── MODELOS ───────────────────────────────────────────────────────────────────
 class Usuario(UserMixin, db.Model):
     __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
@@ -72,8 +71,9 @@ class Registro(db.Model):
     na = db.Column(db.Integer, default=0)
     __table_args__ = (db.UniqueConstraint('colaborador_id', 'treinamento_id', name='_colab_treino_uc'),)
 
-# ── HELPERS & DECORATORS ──────────────────────────────────────────────────────
+# ── CORE LOGIC & HELPERS ──────────────────────────────────────────────────────
 def status_treinamento(data_aprovacao, data_realizacao, na):
+    """Calcula validade ISO. Aprovação > Realização = Pendente."""
     if na: return "NA"
     if not data_realizacao: return "não realizado"
     if not data_aprovacao: return "válido"
@@ -81,13 +81,11 @@ def status_treinamento(data_aprovacao, data_realizacao, na):
     try:
         dt_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d").date()
         dt_real  = datetime.strptime(data_realizacao, "%Y-%m-%d").date()
-        
         return "pendente" if dt_aprov > dt_real else "válido"
     except (ValueError, TypeError):
         return "não realizado"
 
 def _find_user(identifier):
-    """Resolve login como 'admin' para e-mail ou busca direto por e-mail."""
     email = "admin@empresa.com" if identifier == "admin" else identifier
     return Usuario.query.filter_by(email=email, ativo=1).first()
 
@@ -95,7 +93,7 @@ def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated or current_user.role != "admin":
-            flash("Apenas administradores podem acessar essa área.", "error")
+            flash("Acesso negado.", "error")
             return redirect(url_for("index"))
         return f(*args, **kwargs)
     return wrapper
@@ -108,22 +106,18 @@ def load_user(user_id):
 def inject_globals():
     return dict(all_setores=Setor.query.order_by(Setor.sigla).all(), current_user=current_user)
 
-# ── AUTENTICAÇÃO E USUÁRIOS ───────────────────────────────────────────────────
+# ── AUTENTICAÇÃO E ADMIN ──────────────────────────────────────────────────────
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for("index"))
-        
+    if current_user.is_authenticated: return redirect(url_for("index"))
     if request.method == "POST":
         login_input = (request.form.get("login") or request.form.get("email") or "").strip()
         senha_input = request.form.get("senha") or request.form.get("password")
-        
         user = _find_user(login_input)
         if user and check_password_hash(user.senha_hash, senha_input):
             login_user(user)
             return redirect(request.args.get("next") or url_for("index"))
-            
-        flash("Login ou senha incorretos.", "error")
+        flash("Credenciais incorretas.", "error")
     return render_template("login.html")
 
 @app.route("/api/login", methods=["POST"])
@@ -133,17 +127,15 @@ def api_login():
     if user and check_password_hash(user.senha_hash, data.get("password", "")):
         login_user(user)
         return jsonify({"ok": True, "redirect_url": url_for("index")})
-    return jsonify({"error": "E-mail ou senha incorretos."}), 400
+    return jsonify({"error": "Credenciais incorretas."}), 400
 
 @app.route("/api/register", methods=["POST"])
 def api_register():
     data = request.get_json() or {}
     nome, email, password = data.get("name", "").strip(), data.get("email", "").strip(), data.get("password", "")
 
-    if not all([nome, email, password]):
-        return jsonify({"error": "Preencha todos os campos."}), 400
-    if Usuario.query.filter_by(email=email).first():
-        return jsonify({"error": "Este e-mail já está cadastrado."}), 400
+    if not all([nome, email, password]): return jsonify({"error": "Preencha tudo."}), 400
+    if Usuario.query.filter_by(email=email).first(): return jsonify({"error": "E-mail em uso."}), 400
 
     db.session.add(Usuario(nome=nome, email=email, senha_hash=generate_password_hash(password)))
     db.session.commit()
@@ -165,54 +157,47 @@ def usuarios():
 def novo_usuario():
     email = (request.form.get("email") or request.form.get("login") or "").strip()
     if Usuario.query.filter_by(email=email).first():
-        flash("Esse e-mail já existe.", "error")
+        flash("E-mail em uso.", "error")
     else:
         db.session.add(Usuario(
-            nome=request.form.get("nome", "").strip(),
-            email=email,
-            senha_hash=generate_password_hash(request.form.get("senha", "")),
-            role=request.form.get("role", "gestor")
+            nome=request.form.get("nome", "").strip(), email=email,
+            senha_hash=generate_password_hash(request.form.get("senha", "")), role=request.form.get("role", "gestor")
         ))
         db.session.commit()
-        flash("Usuário criado com sucesso.", "ok")
+        flash("Usuário criado.", "ok")
     return redirect(url_for("usuarios"))
 
 @app.route("/usuarios/<int:uid>/desativar", methods=["POST"])
 @admin_required
 def desativar_usuario(uid):
     if uid == current_user.id:
-        flash("Você não pode desativar seu próprio usuário.", "error")
+        flash("Ação negada.", "error")
     else:
         Usuario.query.get_or_404(uid).ativo = 0
         db.session.commit()
         flash("Usuário desativado.", "ok")
     return redirect(url_for("usuarios"))
 
-# ── ROTAS OPERACIONAIS GERAIS ─────────────────────────────────────────────────
+# ── ROTAS OPERACIONAIS ────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     registros = db.session.query(Registro.na, Registro.data_realizacao, Treinamento.data_aprovacao).join(Treinamento).all()
     contagem = {"válido": 0, "não realizado": 0, "NA": 0}
-    
     for r in registros:
         s = status_treinamento(r.data_aprovacao, r.data_realizacao, r.na)
         if s in contagem: contagem[s] += 1
             
-    return render_template("index.html", 
-                           setores=Setor.query.order_by(Setor.sigla).all(), 
+    return render_template("index.html", setores=Setor.query.order_by(Setor.sigla).all(), 
                            total_treinamentos=Treinamento.query.count(), 
-                           total_validos=contagem["válido"], 
-                           total_nao_realizados=contagem["não realizado"])
+                           total_validos=contagem["válido"], total_nao_realizados=contagem["não realizado"])
 
 @app.route("/api/buscar-colaborador")
 def buscar_colaborador():
     q = request.args.get("q", "").strip()
     if len(q) < 2: return jsonify([])
-    
     colabs = Colaborador.query.join(Setor).filter(Colaborador.ativo == 1, Colaborador.nome.like(f"%{q}%")).order_by(Colaborador.nome).limit(12).all()
     return jsonify([{"id": c.id, "nome": c.nome, "sigla": c.setor.sigla, "setor_nome": c.setor.nome} for c in colabs])
 
-# ── CADASTROS BASE (Setores, Colaboradores, Treinamentos) ─────────────────────
 @app.route("/setores/novo", methods=["POST"])
 @login_required
 def novo_setor():
@@ -229,11 +214,8 @@ def colaboradores():
     query = Colaborador.query.join(Setor).filter(Colaborador.ativo == 1)
     if pesquisa: query = query.filter(Colaborador.nome.like(f"%{pesquisa}%"))
     
-    colabs_formatados = [{"id": c.id, "nome": c.nome, "sigla": c.setor.sigla, "setor_nome": c.setor.nome} 
-                         for c in query.order_by(Setor.sigla, Colaborador.nome).all()]
-                         
-    return render_template("colaboradores.html", colaboradores=colabs_formatados, 
-                           setores=Setor.query.order_by(Setor.sigla).all(), pesquisa=pesquisa)
+    colabs_formatados = [{"id": c.id, "nome": c.nome, "sigla": c.setor.sigla, "setor_nome": c.setor.nome} for c in query.order_by(Setor.sigla, Colaborador.nome).all()]
+    return render_template("colaboradores.html", colaboradores=colabs_formatados, setores=Setor.query.order_by(Setor.sigla).all(), pesquisa=pesquisa)
 
 @app.route("/colaboradores/novo", methods=["POST"])
 @login_required
@@ -253,9 +235,7 @@ def excluir_colaborador(cid):
 
 @app.route("/treinamentos")
 def treinamentos():
-    return render_template("treinamentos.html", 
-                           treinamentos=Treinamento.query.order_by(Treinamento.codigo).all(), 
-                           setores=Setor.query.order_by(Setor.sigla).all())
+    return render_template("treinamentos.html", treinamentos=Treinamento.query.order_by(Treinamento.codigo).all(), setores=Setor.query.order_by(Setor.sigla).all())
 
 @app.route("/treinamentos/novo", methods=["GET","POST"])
 @login_required
@@ -283,13 +263,13 @@ def editar_treinamento(tid):
         return redirect(url_for("treinamentos"))
     return render_template("form_treinamento.html", t=t)
 
-# ── DASHBOARD MATRIZ E EXPORTAÇÃO ─────────────────────────────────────────────
+# ── MATRIZ E EXPORTAÇÃO ───────────────────────────────────────────────────────
 @app.route("/setor/<sigla>")
 def setor(sigla):
     s = Setor.query.filter_by(sigla=sigla).first_or_404()
     colabs = Colaborador.query.filter_by(setor_id=s.id, ativo=1).order_by(Colaborador.nome).all()
-    
     filtro = request.args.get("filtro", "").strip().lower()
+    
     treinos_setor = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() 
                      if sigla in [x.strip() for x in t.departamentos.split(",")] and 
                      (not filtro or filtro in t.codigo.lower() or filtro in (t.obs or "").lower())]
@@ -297,23 +277,34 @@ def setor(sigla):
     colab_ids = [c.id for c in colabs]
     registros = Registro.query.filter(Registro.colaborador_id.in_(colab_ids)).all() if colab_ids else []
 
-    return render_template("setor.html", setor=s, colaboradores_setor=colabs, 
-                           treinamentos_setor=treinos_setor, matriz_dados=registros, hoje=date.today().isoformat())
+    return render_template("setor.html", setor=s, colaboradores_setor=colabs, treinamentos_setor=treinos_setor, matriz_dados=registros, hoje=date.today().isoformat())
 
 @app.route("/registro/salvar", methods=["POST"])
 @login_required
 def salvar_registro():
-    cid, tid = int(request.form["colab_id"]), int(request.form["treino_id"])
-    data_real, na = request.form.get("data_realizacao") or None, 1 if request.form.get("na") else 0
-    
-    reg = Registro.query.filter_by(colaborador_id=cid, treinamento_id=tid).first()
-    if reg:
-        reg.data_realizacao, reg.na = data_real, na
-    else:
-        db.session.add(Registro(colaborador_id=cid, treinamento_id=tid, data_realizacao=data_real, na=na))
-        
-    db.session.commit()
-    return jsonify({"ok": True})
+    # Try/Except garante rollback de sessão caso o SQLite trave (Erro 500)
+    try:
+        cid = request.form.get("colab_id")
+        tid = request.form.get("treino_id")
+
+        if not cid or not tid or cid == "undefined" or tid == "undefined":
+            return jsonify({"error": "IDs inválidos ou não informados."}), 400
+
+        cid, tid = int(cid), int(tid)
+        data_real = request.form.get("data_realizacao") or None
+        na = 1 if request.form.get("na") else 0
+
+        reg = Registro.query.filter_by(colaborador_id=cid, treinamento_id=tid).first()
+        if reg:
+            reg.data_realizacao, reg.na = data_real, na
+        else:
+            db.session.add(Registro(colaborador_id=cid, treinamento_id=tid, data_realizacao=data_real, na=na))
+            
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Falha de integridade DB: {str(e)}"}), 500
 
 @app.route("/setor/<int:sid>/exportar")
 def exportar_excel(sid):
@@ -325,7 +316,6 @@ def exportar_excel(sid):
     ws = wb.active
     ws.title = s.sigla
 
-    # Estilos Otimizados
     styles = {
         "verde": PatternFill("solid", fgColor="92D050"), "vermelho": PatternFill("solid", fgColor="FFC7CE"),
         "cinza": PatternFill("solid", fgColor="D9D9D9"), "azul_h": PatternFill("solid", fgColor="1F4E79"),
@@ -336,7 +326,6 @@ def exportar_excel(sid):
     ws.merge_cells("A1:E1")
     ws["A1"].value, ws["A1"].font, ws["A1"].fill, ws["A1"].alignment = "Lista de Treinamentos", Font(bold=True, size=12, color="FFFFFF"), styles["azul_h"], styles["center"]
 
-    # Header de Colaboradores e Configuração de Colunas
     for i, c in enumerate(colabs):
         col = 6 + (i * 2)
         ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col+1)
@@ -344,7 +333,6 @@ def exportar_excel(sid):
         cell.font, cell.fill, cell.alignment = styles["bold_w"], styles["azul_h"], styles["center"]
         ws.column_dimensions[get_column_letter(col)].width = ws.column_dimensions[get_column_letter(col+1)].width = 16
 
-    # Headers Secundários
     headers = ["Item", "Treinamento", "Departamentos Aplicáveis", "Sigla do Doc", "Data de Aprovação"] + ["Data do Treinamento", "Status do Treinamento"] * len(colabs)
     for i, h in enumerate(headers, 1):
         cell = ws.cell(row=2, column=i, value=h)
@@ -352,7 +340,6 @@ def exportar_excel(sid):
 
     ws.column_dimensions["A"].width, ws.column_dimensions["B"].width, ws.column_dimensions["C"].width, ws.column_dimensions["D"].width, ws.column_dimensions["E"].width = 6, 30, 40, 12, 16
 
-    # Preenchimento da Matriz
     for idx, t in enumerate(treinos, 1):
         row = idx + 2
         for ci, val in enumerate([idx, t.codigo, t.departamentos, t.sigla_doc, t.data_aprovacao or ""], 1):
@@ -378,7 +365,6 @@ def exportar_excel(sid):
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name=f"Treinamentos_{s.sigla}_{date.today()}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# ── INICIALIZAÇÃO ─────────────────────────────────────────────────────────────
 with app.app_context():
     db.create_all()
     if not Usuario.query.first():
@@ -388,4 +374,4 @@ with app.app_context():
         print(f"\n⚠️ Usuário admin criado. E-mail: admin@empresa.com / Senha: {senha_inicial}\n")
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)  
+    app.run(debug=True, host="0.0.0.0", port=5000)
