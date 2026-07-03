@@ -76,11 +76,14 @@ class Registro(db.Model):
 def status_treinamento(data_aprovacao, data_realizacao, na):
     if na: return "NA"
     if not data_realizacao: return "não realizado"
+    if not data_aprovacao: return "válido"
+    
     try:
-        dt_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d").date() if data_aprovacao else None
+        dt_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d").date()
         dt_real  = datetime.strptime(data_realizacao, "%Y-%m-%d").date()
-        return "válido" if not dt_aprov or dt_real >= dt_aprov else "não realizado"
-    except ValueError:
+        
+        return "pendente" if dt_aprov > dt_real else "válido"
+    except (ValueError, TypeError):
         return "não realizado"
 
 def _find_user(identifier):
