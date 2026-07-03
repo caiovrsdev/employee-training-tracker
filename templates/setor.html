@@ -31,13 +31,7 @@
             </tr>
         </thead>
         <tbody>
-            {% if Action_List is defined %}
-                {% set t_list = Action_List %}
-            {% elif treinamentos_setor is defined %}
-                {% set t_list = treinamentos_setor %}
-            {% else %}
-                {% set t_list = [] %}
-            {% endif %}
+            {% set t_list = treinamentos_setor if treinamentos_setor is defined else (Action_List if Action_List is defined else []) %}
 
             {% for t in t_list %}
             <tr>
@@ -50,42 +44,46 @@
                 
                 {% if colaboradores_setor is defined and colaboradores_setor %}
                     {% for colab in colaboradores_setor %}
-                    <td style="text-align: center; border-left: 1px solid var(--border); vertical-align: middle;">
-                        
-                        {# Processamento seguro de dados para evitar erro 500 com campos vazios #}
-                        {% set realizado_data = none %}
-                        {% set status_calculado = 'vazio' %}
-                        
-                        {% if matriz_dados is defined and matriz_dados %}
-                            {% for registro in matriz_dados %}
-                                {% if registro.colaborador_id == colab.id and registro.treinamento_id == t.id %}
+                    
+                    {% set realizado_data = none %}
+                    {% set status_calculado = 'vazio' %}
+                    {% set is_na = 0 %}
+                    
+                    {% if matriz_dados is defined and matriz_dados %}
+                        {% for registro in matriz_dados %}
+                            {% if registro.colaborador_id == colab.id and registro.treinamento_id == t.id %}
+                                {% set is_na = registro.na %}
+                                {% if registro.na == 1 %}
+                                    {% set status_calculado = 'na' %}
+                                {% else %}
                                     {% set realizado_data = registro.data_realizacao %}
-                                    
-                                    {% if t.data_aprovacao and registro.data_realizacao %}
-                                        {% if registro.data_realizacao >= t.data_aprovacao %}
-                                            {% set status_calculado = 'valido' %}
-                                        {% else %}
-                                            {% set status_calculado = 'pendente' %}
-                                        {% endif %}
-                                    {% elif registro.data_realizacao %}
-                                        {% set status_calculado = 'valido' %}
-                                    {% endif %}
+                                    {# Chama a função direto do backend (app.py) garantindo 100% de precisão #}
+                                    {% set status_calculado = status_treinamento(t.data_aprovacao, registro.data_realizacao, registro.na) %}
                                 {% endif %}
-                            {% endfor %}
-                        {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
 
-                        {# Renderização exata solicitada: Data e Status abaixo do nome #}
-                        {% if status_calculado == 'valido' %}
-                            <div class="status-badge valido">Válido</div>
-                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Realizado em: {{ realizado_data }}</div>
+                    <td style="text-align: center; border-left: 1px solid var(--border); vertical-align: middle; cursor: pointer;" 
+                        class="matrix-cell" 
+                        data-colab-id="{{ colab.id }}" 
+                        data-treino-id="{{ t.id }}"
+                        data-current-date="{{ realizado_data if realizado_data else '' }}"
+                        data-current-na="{{ is_na }}">
+                        
+                        {% if status_calculado == 'válido' %}
+                            <div class="status-badge valido" style="color: #ffffff !important;">Válido</div>
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">{{ realizado_data }}</div>
                         {% elif status_calculado == 'pendente' %}
-                            <div class="status-badge pendente">Pendente</div>
+                            <div class="status-badge pendente" style="color: #ffffff !important;">Pendente</div>
                             <div style="font-size: 11px; color: var(--red); margin-top: 4px;">Reciclagem: {{ realizado_data }}</div>
+                        {% elif status_calculado == 'na' %}
+                            <div class="status-badge" style="background: var(--border); color: var(--text-dim);">NA</div>
+                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Não Aplicável</div>
                         {% else %}
                             <div class="status-badge vazio">Não Realizado</div>
                             <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">--/--/----</div>
                         {% endif %}
-
                     </td>
                     {% endfor %}
                 {% endif %}
@@ -100,4 +98,101 @@
         </tbody>
     </table>
 </div>
+
+<div id="registroModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div class="card-box" style="width: 340px; background: var(--surface); border: 1px solid var(--border); margin: 0;">
+        <h3 style="margin-bottom: 16px; color: var(--text);">Lançar Treinamento</h3>
+        <form id="registroForm">
+            <input type="hidden" id="modalColabId" name="colab_id">
+            <input type="hidden" id="modalTreinoId" name="treino_id">
+            
+            <div style="margin-bottom: 12px;">
+                <label style="color: var(--text);">Data de Realização <span style="color: var(--red);">*</span></label>
+                <input type="date" id="modalDataRealizacao" name="data_realizacao" class="form-control" required style="margin-bottom: 0;">
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+                <input type="checkbox" id="modalNA" name="na" value="1" style="cursor: pointer; width: 16px; height: 16px;">
+                <label for="modalNA" style="margin-bottom: 0; cursor: pointer; text-transform: none; font-weight: normal; color: var(--text);">Não Aplicável (NA)</label>
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+                <button type="button" id="btnCancelar" class="btn" style="flex: 1; justify-content: center;">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const modal = document.getElementById('registroModal');
+    const form = document.getElementById('registroForm');
+    const checkboxNA = document.getElementById('modalNA');
+    const inputData = document.getElementById('modalDataRealizacao');
+
+    checkboxNA.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            inputData.disabled = true;
+            inputData.value = '';
+            inputData.removeAttribute('required');
+        } else {
+            inputData.disabled = false;
+            inputData.setAttribute('required', 'required');
+        }
+    });
+
+    document.querySelectorAll('.matrix-cell').forEach(cell => {
+        cell.addEventListener('click', () => {
+            document.getElementById('modalColabId').value = cell.dataset.colabId;
+            document.getElementById('modalTreinoId').value = cell.dataset.treinoId;
+            inputData.value = cell.dataset.currentDate || '';
+            
+            const isNA = cell.dataset.currentNa === '1';
+            checkboxNA.checked = isNA;
+            inputData.disabled = isNA;
+            
+            if (isNA) {
+                inputData.removeAttribute('required');
+            } else {
+                inputData.setAttribute('required', 'required');
+            }
+
+            modal.style.display = 'flex';
+        });
+    });
+
+    document.getElementById('btnCancelar').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Garante a extração limpa para transmissão via URLSearchParams x-www-form-urlencoded
+        const params = new URLSearchParams();
+        params.append('colab_id', document.getElementById('modalColabId').value);
+        params.append('treino_id', document.getElementById('modalTreinoId').value);
+        params.append('data_realizacao', inputData.value);
+        if (checkboxNA.checked) params.append('na', '1');
+
+        try {
+            const response = await fetch('/registro/salvar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Erro ao processar requisição no servidor.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Falha na comunicação com o backend.');
+        }
+    });
+});
+</script>
 {% endblock %}
