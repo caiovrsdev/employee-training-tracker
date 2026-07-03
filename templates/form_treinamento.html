@@ -9,19 +9,19 @@
   <form method="POST">
     
     <label>Código / Nome do Treinamento</label>
-    <input type="text" name="codigo" class="form-control" value="{{ t.codigo if t else '' }}" required placeholder="Ex: IT-LAB-001 - Manuseio de Vidraria">
+    <input type="text" name="codigo" class="form-control" value="{{ t.codigo if t else '' }}" required placeholder="Ex: POP-TX 01.02 - Circulação no Biotério">
     
     <label>Departamentos Aplicáveis (Separados por vírgula)</label>
-    <input type="text" name="departamentos" class="form-control" style="margin-bottom: 4px;" value="{{ t.departamentos if t else '' }}" required placeholder="Ex: LAB, QUAL, ADM">
+    <input type="text" name="departamentos" class="form-control" style="margin-bottom: 4px;" value="{{ t.departamentos if t else '' }}" required placeholder="Ex: GQ, GL, ADM">
     <small style="color: var(--text-dim); font-size: 11px; display: block; margin-bottom: 14px;">Escreva as siglas exatas dos setores separadas por vírgula.</small>
 
     <div class="grid-2" style="margin-bottom: 0;">
       <div>
-        <label>Sigla do Documento (Opcional)</label>
-        <input type="text" name="sigla_doc" class="form-control" value="{{ t.sigla_doc if t else '' }}" placeholder="Ex: DOC-01">
+        <label>Sigla do Documento (Obrigatório)</label>
+        <input type="text" name="sigla_doc" class="form-control" value="{{ t.sigla_doc if t else '' }}" placeholder="Ex: TRI307/2025">
       </div>
       <div>
-        <label>Data de Aprovação (Opcional)</label>
+        <label>Data de Aprovação (Obrigatório)</label>
         <input type="date" name="data_aprovacao" class="form-control" value="{{ t.data_aprovacao if t else '' }}">
       </div>
     </div>
