@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="topbar">
     <h1>Matriz de Treinamentos / Acessos: {{ setor.sigla if setor is defined else '' }} - {{ setor.nome if setor is defined else '' }}</h1>
@@ -57,7 +56,7 @@
                                     {% set status_calculado = 'na' %}
                                 {% else %}
                                     {% set realizado_data = registro.data_realizacao %}
-                                    {# Chama a função direto do backend (app.py) garantindo 100% de precisão #}
+                                    {# Chama a função direto do backend para não haver divergência de cálculo #}
                                     {% set status_calculado = status_treinamento(t.data_aprovacao, registro.data_realizacao, registro.na) %}
                                 {% endif %}
                             {% endif %}
@@ -90,9 +89,7 @@
             </tr>
             {% else %}
             <tr>
-                <td style="text-align: center; color: var(--text-dim); padding: 32px;">
-                    Nenhum treinamento aplicável encontrado para este setor.
-                </td>
+                <td style="text-align: center; color: var(--text-dim); padding: 32px;">Nenhum treinamento aplicável encontrado para este setor.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -152,24 +149,18 @@ document.addEventListener("DOMContentLoaded", function() {
             checkboxNA.checked = isNA;
             inputData.disabled = isNA;
             
-            if (isNA) {
-                inputData.removeAttribute('required');
-            } else {
-                inputData.setAttribute('required', 'required');
-            }
+            if (isNA) inputData.removeAttribute('required');
+            else inputData.setAttribute('required', 'required');
 
             modal.style.display = 'flex';
         });
     });
 
-    document.getElementById('btnCancelar').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
+    document.getElementById('btnCancelar').addEventListener('click', () => modal.style.display = 'none');
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // Garante a extração limpa para transmissão via URLSearchParams x-www-form-urlencoded
         const params = new URLSearchParams();
         params.append('colab_id', document.getElementById('modalColabId').value);
         params.append('treino_id', document.getElementById('modalTreinoId').value);
@@ -186,11 +177,12 @@ document.addEventListener("DOMContentLoaded", function() {
             if (response.ok) {
                 window.location.reload();
             } else {
-                alert('Erro ao processar requisição no servidor.');
+                const errData = await response.json();
+                alert('Aviso do Sistema: ' + (errData.error || 'Erro desconhecido.'));
             }
         } catch (error) {
             console.error(error);
-            alert('Falha na comunicação com o backend.');
+            alert('Falha crítica de comunicação com o servidor.');
         }
     });
 });
