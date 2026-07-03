@@ -104,7 +104,11 @@ def load_user(user_id):
 
 @app.context_processor
 def inject_globals():
-    return dict(all_setores=Setor.query.order_by(Setor.sigla).all(), current_user=current_user)
+    return dict(
+        all_setores=Setor.query.order_by(Setor.sigla).all(), 
+        current_user=current_user,
+        status_treinamento=status_treinamento
+    )
 
 # ── AUTENTICAÇÃO E ADMIN ──────────────────────────────────────────────────────
 @app.route("/login", methods=["GET", "POST"])
