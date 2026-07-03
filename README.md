@@ -8,12 +8,12 @@ web application for managing employee training records, certifications, and comp
 - Training expiration monitoring
 - Search and filtering
 - Responsive web interface
-- SQLite database integration
+- SQLAlchemy database integration
 
   ## Tech Stack
 - Python
 - Flask
-- SQLite
+- SQLAlchemy
 - HTML5
 - CSS3
 - JavaScript
@@ -63,9 +63,11 @@ Future Improvements:
 
 ### Screenshots
 
-<img width="1365" height="607" alt="image" src="https://github.com/user-attachments/assets/57d11adc-5dd9-4101-b110-716e300afe56" />
-<img width="1366" height="610" alt="image" src="https://github.com/user-attachments/assets/0fa23e77-d9b8-4a4b-836c-47e79f5acf44" />
-<img width="1365" height="607" alt="image" src="https://github.com/user-attachments/assets/7f98fb17-236f-4a2f-85ce-eceb219dd642" />
+<img width="1366" height="609" alt="image" src="https://github.com/user-attachments/assets/8d9b356e-9178-4e2c-b7fd-6f4de7a50495" />
+<img width="1366" height="608" alt="image" src="https://github.com/user-attachments/assets/c739a490-37ee-4c77-b800-4983153d56b6" />
+<img width="1366" height="603" alt="image" src="https://github.com/user-attachments/assets/962b4dea-9cc1-4f06-9f80-7012f7176f65" />
+<img width="1366" height="603" alt="image" src="https://github.com/user-attachments/assets/16948acf-f412-477b-9d5e-f81f5f386917" />
+
 
 ## Background
 
