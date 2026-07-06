@@ -1,188 +1,64 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="topbar">
-    <h1>Matriz de Treinamentos / Acessos: {{ setor.sigla if setor is defined else '' }} - {{ setor.nome if setor is defined else '' }}</h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Matriz: {{ setor.sigla }} - {{ setor.nome }}</h2>
     <div style="display: flex; gap: 8px;">
-        <a href="/setor/{{ setor.id }}/exportar" class="btn btn-success">Exportar Excel</a>
+        <a href="/setor/{{ setor.id }}/exportar" class="btn">Excel</a>
         <a href="/" class="btn">Voltar</a>
     </div>
 </div>
 
-<div class="card-box" style="margin-bottom: 20px;">
-    <form method="GET" style="display: flex; gap: 10px; margin: 0;">
-        <input type="text" name="filtro" class="form-control" style="margin: 0;" placeholder="Filtrar por nome do treinamento ou código..." value="{{ request.args.get('filtro', '') }}">
-        <button type="submit" class="btn btn-primary">Filtrar Matriz</button>
-    </form>
-</div>
-
-<div class="table-wrap">
+<div class="card-box" style="padding: 0; overflow-x: auto;">
     <table>
         <thead>
             <tr>
-                <th style="min-width: 300px;">Sistemas de Acesso / Treinamentos</th>
-                {% if colaboradores_setor is defined and colaboradores_setor %}
-                    {% for colab in colaboradores_setor %}
-                    <th style="text-align: center; min-width: 160px; border-left: 1px solid var(--border);">
-                        <div>{{ colab.nome }}</div>
-                    </th>
-                    {% endfor %}
-                {% endif %}
+                <th style="min-width: 250px;">Treinamento</th>
+                {% for c in colaboradores_setor %}
+                <th style="text-align: center; min-width: 140px; border-left: 1px solid var(--border);">
+                    <a href="/colaborador/{{ c.id }}" style="color: var(--primary); text-decoration: none; font-size: 14px;">{{ c.nome }}</a>
+                </th>
+                {% endfor %}
             </tr>
         </thead>
         <tbody>
-            {% set t_list = treinamentos_setor if treinamentos_setor is defined else (Action_List if Action_List is defined else []) %}
-
-            {% for t in t_list %}
+            {% for t in treinamentos_setor %}
             <tr>
                 <td>
-                    <div style="font-weight: 700; color: var(--text);">{{ t.nome }}</div>
-                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">
-                        Aprovação: {{ t.data_aprovacao if t.data_aprovacao else 'Não informada' }}
-                    </div>
+                    <div style="font-weight: 600;">{{ t.nome }}</div>
+                    <div style="font-size: 11px; color: var(--text-dim);">Aprovação: {{ t.data_aprovacao or '--' }}</div>
                 </td>
                 
-                {% if colaboradores_setor is defined and colaboradores_setor %}
-                    {% for colab in colaboradores_setor %}
-                    
-                    {# O USO DO NAMESPACE RESOLVE O "BUG INVISÍVEL" DO JINJA #}
-                    {% set ns = namespace(realizado_data=none, status_calculado='vazio', is_na=0) %}
-                    
-                    {% if matriz_dados is defined and matriz_dados %}
-                        {% for registro in matriz_dados %}
-                            {% if registro.colaborador_id == colab.id and registro.treinamento_id == t.id %}
-                                {% set ns.is_na = registro.na %}
-                                {% if registro.na == 1 %}
-                                    {% set ns.status_calculado = 'na' %}
-                                {% else %}
-                                    {% set ns.realizado_data = registro.data_realizacao %}
-                                    {% set ns.status_calculado = status_treinamento(t.data_aprovacao, registro.data_realizacao, registro.na) %}
-                                {% endif %}
+                {% for colab in colaboradores_setor %}
+                    {% set ns = namespace(data=none, status='vazio', is_na=0) %}
+                    {% for r in matriz_dados %}
+                        {% if r.colaborador_id == colab.id and r.treinamento_id == t.id %}
+                            {% set ns.is_na = r.na %}
+                            {% if r.na == 1 %}{% set ns.status = 'na' %}
+                            {% else %}
+                                {% set ns.data = r.data_realizacao %}
+                                {% set ns.status = status_treinamento(t.data_aprovacao, r.data_realizacao, r.na) %}
                             {% endif %}
-                        {% endfor %}
-                    {% endif %}
+                        {% endif %}
+                    {% endfor %}
 
-                    <td style="text-align: center; border-left: 1px solid var(--border); vertical-align: middle; cursor: pointer;" 
-                        class="matrix-cell" 
-                        data-colab-id="{{ colab.id }}" 
-                        data-treino-id="{{ t.id }}"
-                        data-current-date="{{ ns.realizado_data if ns.realizado_data else '' }}"
-                        data-current-na="{{ ns.is_na }}">
+                    <td class="matrix-cell" style="text-align: center; border-left: 1px solid var(--border); cursor: pointer;"
+                        data-colab-id="{{ colab.id }}" data-treino-id="{{ t.id }}"
+                        data-current-date="{{ ns.data or '' }}" data-current-na="{{ ns.is_na }}">
                         
-                        {% if ns.status_calculado == 'válido' %}
-                            <div class="status-badge valido" style="color: #ffffff !important;">Válido</div>
-                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">{{ ns.realizado_data }}</div>
-                        {% elif ns.status_calculado == 'pendente' %}
-                            <div class="status-badge pendente" style="color: #ffffff !important;">Pendente</div>
-                            <div style="font-size: 11px; color: var(--red); margin-top: 4px;">Reciclagem: {{ ns.realizado_data }}</div>
-                        {% elif ns.status_calculado == 'na' %}
+                        {% if ns.status == 'válido' %}
+                            <div class="status-badge valido">Válido</div><div style="font-size: 11px; color: var(--text-dim);">{{ ns.data }}</div>
+                        {% elif ns.status == 'pendente' %}
+                            <div class="status-badge pendente">Pendente</div><div style="font-size: 11px; color: var(--red);">{{ ns.data }}</div>
+                        {% elif ns.status == 'na' %}
                             <div class="status-badge" style="background: var(--border); color: var(--text-dim);">NA</div>
-                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Não Aplicável</div>
                         {% else %}
-                            <div class="status-badge vazio">Não Realizado</div>
-                            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">--/--/----</div>
+                            <div class="status-badge vazio">Não Feito</div>
                         {% endif %}
                     </td>
-                    {% endfor %}
-                {% endif %}
-            </tr>
-            {% else %}
-            <tr>
-                <td style="text-align: center; color: var(--text-dim); padding: 32px;">Nenhum treinamento aplicável encontrado para este setor.</td>
+                {% endfor %}
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
-
-<div id="registroModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-    <div class="card-box" style="width: 340px; background: var(--surface); border: 1px solid var(--border); margin: 0;">
-        <h3 style="margin-bottom: 16px; color: var(--text);">Lançar Treinamento</h3>
-        <form id="registroForm">
-            <input type="hidden" id="modalColabId" name="colab_id">
-            <input type="hidden" id="modalTreinoId" name="treino_id">
-            
-            <div style="margin-bottom: 12px;">
-                <label style="color: var(--text);">Data de Realização <span style="color: var(--red);">*</span></label>
-                <input type="date" id="modalDataRealizacao" name="data_realizacao" class="form-control" required style="margin-bottom: 0;">
-            </div>
-            
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
-                <input type="checkbox" id="modalNA" name="na" value="1" style="cursor: pointer; width: 16px; height: 16px;">
-                <label for="modalNA" style="margin-bottom: 0; cursor: pointer; text-transform: none; font-weight: normal; color: var(--text);">Não Aplicável (NA)</label>
-            </div>
-            
-            <div style="display: flex; gap: 8px;">
-                <button type="button" id="btnCancelar" class="btn" style="flex: 1; justify-content: center;">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">Salvar</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const modal = document.getElementById('registroModal');
-    const form = document.getElementById('registroForm');
-    const checkboxNA = document.getElementById('modalNA');
-    const inputData = document.getElementById('modalDataRealizacao');
-
-    checkboxNA.addEventListener('change', (e) => {
-        if (e.target.checked) {
-            inputData.disabled = true;
-            inputData.value = '';
-            inputData.removeAttribute('required');
-        } else {
-            inputData.disabled = false;
-            inputData.setAttribute('required', 'required');
-        }
-    });
-
-    document.querySelectorAll('.matrix-cell').forEach(cell => {
-        cell.addEventListener('click', () => {
-            document.getElementById('modalColabId').value = cell.dataset.colabId;
-            document.getElementById('modalTreinoId').value = cell.dataset.treinoId;
-            inputData.value = cell.dataset.currentDate || '';
-            
-            const isNA = cell.dataset.currentNa === '1';
-            checkboxNA.checked = isNA;
-            inputData.disabled = isNA;
-            
-            if (isNA) inputData.removeAttribute('required');
-            else inputData.setAttribute('required', 'required');
-
-            modal.style.display = 'flex';
-        });
-    });
-
-    document.getElementById('btnCancelar').addEventListener('click', () => modal.style.display = 'none');
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const params = new URLSearchParams();
-        params.append('colab_id', document.getElementById('modalColabId').value);
-        params.append('treino_id', document.getElementById('modalTreinoId').value);
-        params.append('data_realizacao', inputData.value);
-        if (checkboxNA.checked) params.append('na', '1');
-
-        try {
-            const response = await fetch('/registro/salvar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
-            });
-            
-            if (response.ok) {
-                window.location.reload();
-            } else {
-                const errData = await response.json();
-                alert('Aviso do Sistema: ' + (errData.error || 'Erro desconhecido.'));
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Falha crítica de comunicação com o servidor.');
-        }
-    });
-});
-</script>
 {% endblock %}
