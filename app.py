@@ -19,7 +19,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
-login_manager.login_message = "Faça login para acessar esta área."
 
 # ── MODELOS ───────────────────────────────────────────────────────────────────
 class Usuario(UserMixin, db.Model):
@@ -42,6 +41,7 @@ class Colaborador(db.Model):
     __tablename__ = 'colaboradores'
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
+    cargo = db.Column(db.String(50), nullable=False, default='analista') # NOVO CAMPO
     setor_id = db.Column(db.Integer, db.ForeignKey('setores.id'), nullable=False)
     ativo = db.Column(db.Integer, default=1)
     registros = db.relationship('Registro', backref='colaborador', cascade="all, delete-orphan", lazy=True)
@@ -55,12 +55,8 @@ class Treinamento(db.Model):
     data_aprovacao = db.Column(db.String(20))
     obs = db.Column(db.Text)
     registros = db.relationship('Registro', backref='treinamento', cascade="all, delete-orphan", lazy=True)
-
     @property
     def nome(self): return self.codigo
-    
-    @property
-    def observacoes(self): return self.obs
 
 class Registro(db.Model):
     __tablename__ = 'registros'
@@ -71,23 +67,24 @@ class Registro(db.Model):
     na = db.Column(db.Integer, default=0)
     __table_args__ = (db.UniqueConstraint('colaborador_id', 'treinamento_id', name='_colab_treino_uc'),)
 
-# ── CORE LOGIC & HELPERS ──────────────────────────────────────────────────────
+# ── FUNÇÕES GLOBAIS ───────────────────────────────────────────────────────────
 def status_treinamento(data_aprovacao, data_realizacao, na):
-    """Calcula validade ISO. Aprovação > Realização = Pendente."""
     if na: return "NA"
     if not data_realizacao: return "não realizado"
     if not data_aprovacao: return "válido"
-    
     try:
         dt_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d").date()
         dt_real  = datetime.strptime(data_realizacao, "%Y-%m-%d").date()
         return "pendente" if dt_aprov > dt_real else "válido"
-    except (ValueError, TypeError):
-        return "não realizado"
+    except: return "não realizado"
 
-def _find_user(identifier):
-    email = "admin@empresa.com" if identifier == "admin" else identifier
-    return Usuario.query.filter_by(email=email, ativo=1).first()
+@login_manager.user_loader
+def load_user(user_id):
+    return Usuario.query.get(int(user_id))
+
+@app.context_processor
+def inject_globals():
+    return dict(all_setores=Setor.query.order_by(Setor.sigla).all(), current_user=current_user, status_treinamento=status_treinamento)
 
 def admin_required(f):
     @wraps(f)
@@ -98,52 +95,19 @@ def admin_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-@login_manager.user_loader
-def load_user(user_id):
-    return Usuario.query.filter_by(id=int(user_id), ativo=1).first()
-
-@app.context_processor
-def inject_globals():
-    return dict(
-        all_setores=Setor.query.order_by(Setor.sigla).all(), 
-        current_user=current_user,
-        status_treinamento=status_treinamento
-    )
-
-# ── AUTENTICAÇÃO E ADMIN ──────────────────────────────────────────────────────
+# ── AUTENTICAÇÃO ──────────────────────────────────────────────────────────────
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated: return redirect(url_for("index"))
     if request.method == "POST":
         login_input = (request.form.get("login") or request.form.get("email") or "").strip()
         senha_input = request.form.get("senha") or request.form.get("password")
-        user = _find_user(login_input)
+        user = Usuario.query.filter_by(email="admin@empresa.com" if login_input=="admin" else login_input, ativo=1).first()
         if user and check_password_hash(user.senha_hash, senha_input):
             login_user(user)
-            return redirect(request.args.get("next") or url_for("index"))
+            return redirect(url_for("index"))
         flash("Credenciais incorretas.", "error")
     return render_template("login.html")
-
-@app.route("/api/login", methods=["POST"])
-def api_login():
-    data = request.get_json() or {}
-    user = _find_user((data.get("email") or "").strip())
-    if user and check_password_hash(user.senha_hash, data.get("password", "")):
-        login_user(user)
-        return jsonify({"ok": True, "redirect_url": url_for("index")})
-    return jsonify({"error": "Credenciais incorretas."}), 400
-
-@app.route("/api/register", methods=["POST"])
-def api_register():
-    data = request.get_json() or {}
-    nome, email, password = data.get("name", "").strip(), data.get("email", "").strip(), data.get("password", "")
-
-    if not all([nome, email, password]): return jsonify({"error": "Preencha tudo."}), 400
-    if Usuario.query.filter_by(email=email).first(): return jsonify({"error": "E-mail em uso."}), 400
-
-    db.session.add(Usuario(nome=nome, email=email, senha_hash=generate_password_hash(password)))
-    db.session.commit()
-    return jsonify({"ok": True})
 
 @app.route("/logout")
 @login_required
@@ -151,152 +115,77 @@ def logout():
     logout_user()
     return redirect(url_for("login"))
 
-@app.route("/usuarios")
-@admin_required
-def usuarios():
-    return render_template("usuarios.html", usuarios=Usuario.query.filter_by(ativo=1).order_by(Usuario.nome).all())
-
-@app.route("/usuarios/novo", methods=["POST"])
-@admin_required
-def novo_usuario():
-    email = (request.form.get("email") or request.form.get("login") or "").strip()
-    if Usuario.query.filter_by(email=email).first():
-        flash("E-mail em uso.", "error")
-    else:
-        db.session.add(Usuario(
-            nome=request.form.get("nome", "").strip(), email=email,
-            senha_hash=generate_password_hash(request.form.get("senha", "")), role=request.form.get("role", "gestor")
-        ))
-        db.session.commit()
-        flash("Usuário criado.", "ok")
-    return redirect(url_for("usuarios"))
-
-@app.route("/usuarios/<int:uid>/desativar", methods=["POST"])
-@admin_required
-def desativar_usuario(uid):
-    if uid == current_user.id:
-        flash("Ação negada.", "error")
-    else:
-        Usuario.query.get_or_404(uid).ativo = 0
-        db.session.commit()
-        flash("Usuário desativado.", "ok")
-    return redirect(url_for("usuarios"))
-
-# ── ROTAS OPERACIONAIS ────────────────────────────────────────────────────────
+# ── ROTAS PRINCIPAIS ──────────────────────────────────────────────────────────
 @app.route("/")
+@login_required
 def index():
     registros = db.session.query(Registro.na, Registro.data_realizacao, Treinamento.data_aprovacao).join(Treinamento).all()
-    contagem = {"válido": 0, "não realizado": 0, "NA": 0}
+    c = {"válido": 0, "não realizado": 0, "pendente": 0, "NA": 0}
     for r in registros:
         s = status_treinamento(r.data_aprovacao, r.data_realizacao, r.na)
-        if s in contagem: contagem[s] += 1
-            
-    return render_template("index.html", setores=Setor.query.order_by(Setor.sigla).all(), 
-                           total_treinamentos=Treinamento.query.count(), 
-                           total_validos=contagem["válido"], total_nao_realizados=contagem["não realizado"])
-
-@app.route("/api/buscar-colaborador")
-def buscar_colaborador():
-    q = request.args.get("q", "").strip()
-    if len(q) < 2: return jsonify([])
-    colabs = Colaborador.query.join(Setor).filter(Colaborador.ativo == 1, Colaborador.nome.like(f"%{q}%")).order_by(Colaborador.nome).limit(12).all()
-    return jsonify([{"id": c.id, "nome": c.nome, "sigla": c.setor.sigla, "setor_nome": c.setor.nome} for c in colabs])
-
-@app.route("/setores/novo", methods=["POST"])
-@login_required
-def novo_setor():
-    sigla = request.form["sigla"].upper().strip()
-    if not Setor.query.filter_by(sigla=sigla).first():
-        db.session.add(Setor(sigla=sigla, nome=request.form["nome"].strip()))
-        db.session.commit()
-        flash("Setor cadastrado.", "ok")
-    return redirect(url_for("colaboradores"))
+        if s in c: c[s] += 1
+    return render_template("index.html", t_validos=c["válido"], t_pendentes=c["não realizado"] + c["pendente"], total=Treinamento.query.count())
 
 @app.route("/colaboradores")
+@login_required
 def colaboradores():
     pesquisa = request.args.get("busca_nome", "").strip()
-    query = Colaborador.query.join(Setor).filter(Colaborador.ativo == 1)
+    query = Colaborador.query.filter_by(ativo=1)
     if pesquisa: query = query.filter(Colaborador.nome.like(f"%{pesquisa}%"))
-    
-    colabs_formatados = [{"id": c.id, "nome": c.nome, "sigla": c.setor.sigla, "setor_nome": c.setor.nome} for c in query.order_by(Setor.sigla, Colaborador.nome).all()]
-    return render_template("colaboradores.html", colaboradores=colabs_formatados, setores=Setor.query.order_by(Setor.sigla).all(), pesquisa=pesquisa)
+    return render_template("colaboradores.html", colaboradores=query.join(Setor).order_by(Colaborador.nome).all())
 
 @app.route("/colaboradores/novo", methods=["POST"])
 @login_required
 def novo_colaborador():
-    db.session.add(Colaborador(nome=request.form["nome"], setor_id=int(request.form["setor_id"])))
+    db.session.add(Colaborador(nome=request.form["nome"].strip(), setor_id=int(request.form["setor_id"]), cargo=request.form["cargo"]))
     db.session.commit()
     flash("Colaborador cadastrado.", "ok")
     return redirect(url_for("colaboradores"))
 
-@app.route("/colaboradores/<int:cid>/excluir", methods=["POST"])
+# ABA INDIVIDUAL DO COLABORADOR
+@app.route("/colaborador/<int:cid>")
 @login_required
-def excluir_colaborador(cid):
-    Colaborador.query.get_or_404(cid).ativo = 0
-    db.session.commit()
-    flash("Colaborador desativado.", "ok")
-    return redirect(url_for("colaboradores"))
+def aba_colaborador(cid):
+    c = Colaborador.query.get_or_404(cid)
+    treinos = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() if c.setor.sigla in [x.strip() for x in t.departamentos.split(",")]]
+    registros = Registro.query.filter_by(colaborador_id=c.id).all()
+    return render_template("colaborador.html", colab=c, treinamentos_setor=treinos, matriz_dados=registros)
 
-@app.route("/treinamentos")
-def treinamentos():
-    return render_template("treinamentos.html", treinamentos=Treinamento.query.order_by(Treinamento.codigo).all(), setores=Setor.query.order_by(Setor.sigla).all())
-
-@app.route("/treinamentos/novo", methods=["GET","POST"])
-@login_required
-def novo_treinamento():
-    if request.method == "POST":
-        db.session.add(Treinamento(
-            codigo=request.form["codigo"], departamentos=request.form["departamentos"],
-            sigla_doc=request.form["sigla_doc"], data_aprovacao=request.form["data_aprovacao"] or None, obs=request.form["obs"]
-        ))
-        db.session.commit()
-        flash("Treinamento cadastrado.", "ok")
-        return redirect(url_for("treinamentos"))
-    return render_template("form_treinamento.html", t=None)
-
-@app.route("/treinamentos/<int:tid>/editar", methods=["GET","POST"])
-@login_required
-def editar_treinamento(tid):
-    t = Treinamento.query.get_or_404(tid)
-    if request.method == "POST":
-        t.codigo, t.departamentos = request.form["codigo"], request.form["departamentos"]
-        t.sigla_doc, t.data_aprovacao = request.form["sigla_doc"], request.form["data_aprovacao"] or None
-        t.obs = request.form["obs"]
-        db.session.commit()
-        flash("Treinamento atualizado.", "ok")
-        return redirect(url_for("treinamentos"))
-    return render_template("form_treinamento.html", t=t)
-
-# ── MATRIZ E EXPORTAÇÃO ───────────────────────────────────────────────────────
 @app.route("/setor/<sigla>")
+@login_required
 def setor(sigla):
     s = Setor.query.filter_by(sigla=sigla).first_or_404()
     colabs = Colaborador.query.filter_by(setor_id=s.id, ativo=1).order_by(Colaborador.nome).all()
-    filtro = request.args.get("filtro", "").strip().lower()
+    treinos = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() if sigla in [x.strip() for x in t.departamentos.split(",")]]
+    registros = Registro.query.filter(Registro.colaborador_id.in_([c.id for c in colabs])).all() if colabs else []
+    return render_template("setor.html", setor=s, colaboradores_setor=colabs, treinamentos_setor=treinos, matriz_dados=registros)
+
+# ROTA DO FUNIL (AJAX)
+@app.route("/api/funil_colaboradores")
+@login_required
+def funil_colabs():
+    setor_id = request.args.get("setor_id")
+    cargo = request.args.get("cargo")
+    query = Colaborador.query.filter_by(ativo=1)
+    if setor_id: query = query.filter_by(setor_id=int(setor_id))
+    if cargo: query = query.filter_by(cargo=cargo)
     
-    treinos_setor = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() 
-                     if sigla in [x.strip() for x in t.departamentos.split(",")] and 
-                     (not filtro or filtro in t.codigo.lower() or filtro in (t.obs or "").lower())]
-        
-    colab_ids = [c.id for c in colabs]
-    registros = Registro.query.filter(Registro.colaborador_id.in_(colab_ids)).all() if colab_ids else []
+    resultados = [{"id": c.id, "nome": c.nome, "cargo": c.cargo.title()} for c in query.order_by(Colaborador.nome).all()]
+    return jsonify(resultados)
 
-    return render_template("setor.html", setor=s, colaboradores_setor=colabs, treinamentos_setor=treinos_setor, matriz_dados=registros, hoje=date.today().isoformat())
-
+# ROTA DE REGISTRO UNIFICADA (COM FORÇAR ATUALIZAÇÃO)
 @app.route("/registro/salvar", methods=["POST"])
 @login_required
 def salvar_registro():
-    # Try/Except garante rollback de sessão caso o SQLite trave (Erro 500)
     try:
-        cid = request.form.get("colab_id")
-        tid = request.form.get("treino_id")
-
-        if not cid or not tid or cid == "undefined" or tid == "undefined":
-            return jsonify({"error": "IDs inválidos ou não informados."}), 400
-
-        cid, tid = int(cid), int(tid)
+        cid, tid = int(request.form.get("colab_id")), int(request.form.get("treino_id"))
         data_real = request.form.get("data_realizacao") or None
         na = 1 if request.form.get("na") else 0
+        forcar_atualizacao = request.form.get("atualizar") # Checagem do Switch
+
+        if forcar_atualizacao: # Se marcou, invalida o treinamento imediatamente
+            data_real = None
+            na = 0
 
         reg = Registro.query.filter_by(colaborador_id=cid, treinamento_id=tid).first()
         if reg:
@@ -308,74 +197,13 @@ def salvar_registro():
         return jsonify({"ok": True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"Falha de integridade DB: {str(e)}"}), 500
-
-@app.route("/setor/<int:sid>/exportar")
-def exportar_excel(sid):
-    s = Setor.query.get_or_404(sid)
-    colabs = Colaborador.query.filter_by(setor_id=s.id, ativo=1).order_by(Colaborador.nome).all()
-    treinos = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() if s.sigla in [x.strip() for x in t.departamentos.split(",")]]
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = s.sigla
-
-    styles = {
-        "verde": PatternFill("solid", fgColor="92D050"), "vermelho": PatternFill("solid", fgColor="FFC7CE"),
-        "cinza": PatternFill("solid", fgColor="D9D9D9"), "azul_h": PatternFill("solid", fgColor="1F4E79"),
-        "bold_w": Font(bold=True, color="FFFFFF"), "center": Alignment(horizontal="center", vertical="center", wrap_text=True),
-        "border": Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
-    }
-
-    ws.merge_cells("A1:E1")
-    ws["A1"].value, ws["A1"].font, ws["A1"].fill, ws["A1"].alignment = "Lista de Treinamentos", Font(bold=True, size=12, color="FFFFFF"), styles["azul_h"], styles["center"]
-
-    for i, c in enumerate(colabs):
-        col = 6 + (i * 2)
-        ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col+1)
-        cell = ws.cell(row=1, column=col, value=c.nome)
-        cell.font, cell.fill, cell.alignment = styles["bold_w"], styles["azul_h"], styles["center"]
-        ws.column_dimensions[get_column_letter(col)].width = ws.column_dimensions[get_column_letter(col+1)].width = 16
-
-    headers = ["Item", "Treinamento", "Departamentos Aplicáveis", "Sigla do Doc", "Data de Aprovação"] + ["Data do Treinamento", "Status do Treinamento"] * len(colabs)
-    for i, h in enumerate(headers, 1):
-        cell = ws.cell(row=2, column=i, value=h)
-        cell.font, cell.fill, cell.alignment, cell.border = styles["bold_w"], styles["azul_h"], styles["center"], styles["border"]
-
-    ws.column_dimensions["A"].width, ws.column_dimensions["B"].width, ws.column_dimensions["C"].width, ws.column_dimensions["D"].width, ws.column_dimensions["E"].width = 6, 30, 40, 12, 16
-
-    for idx, t in enumerate(treinos, 1):
-        row = idx + 2
-        for ci, val in enumerate([idx, t.codigo, t.departamentos, t.sigla_doc, t.data_aprovacao or ""], 1):
-            cell = ws.cell(row=row, column=ci, value=val)
-            cell.alignment, cell.border = styles["center"], styles["border"]
-
-        for i, c in enumerate(colabs):
-            col = 6 + (i * 2)
-            reg = Registro.query.filter_by(colaborador_id=c.id, treinamento_id=t.id).first()
-            
-            st = status_treinamento(t.data_aprovacao, reg.data_realizacao if reg else None, reg.na if reg else 0)
-            data_val = (reg.data_realizacao if not reg.na else "NA") if reg else ""
-            
-            dc, sc = ws.cell(row=row, column=col, value=data_val), ws.cell(row=row, column=col+1, value=st if reg else "—")
-            dc.alignment, dc.border, sc.alignment, sc.border = styles["center"], styles["border"], styles["center"], styles["border"]
-            
-            if st == "válido" and reg: sc.fill = styles["verde"]
-            elif st == "não realizado" and reg: sc.fill = styles["vermelho"]
-            elif st == "NA" and reg: sc.fill = styles["cinza"]
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name=f"Treinamentos_{s.sigla}_{date.today()}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        return jsonify({"error": str(e)}), 500
 
 with app.app_context():
     db.create_all()
     if not Usuario.query.first():
-        senha_inicial = os.environ.get("ADMIN_SENHA_INICIAL", "admin123")
-        db.session.add(Usuario(nome="Administrador", email="admin@empresa.com", senha_hash=generate_password_hash(senha_inicial), role="admin"))
+        db.session.add(Usuario(nome="Admin", email="admin@empresa.com", senha_hash=generate_password_hash("admin123"), role="admin"))
         db.session.commit()
-        print(f"\n⚠️ Usuário admin criado. E-mail: admin@empresa.com / Senha: {senha_inicial}\n")
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
