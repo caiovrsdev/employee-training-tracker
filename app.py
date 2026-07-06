@@ -1,209 +1,188 @@
-import os, io
-from datetime import date, datetime
-from functools import wraps
-
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash
+import os
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-
+# ==========================================
+# 1. CONFIGURAÇÕES INICIAIS DO FLASK E BANCO
+# ==========================================
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-key-troque-em-producao")
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.abspath(os.path.dirname(__file__)), 'treinamentos.db')}"
+# Chave secreta obrigatória para o Flask-Login (Pode mudar depois)
+app.secret_key = 'chave_secreta_ecolyzer_super_segura'
+
+# Configuração do Banco de Dados (SQLAlchemy)
+basedir = os.path.abspath(os.path.dirname(__name__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'treinamentos.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
 
-# ── MODELOS ───────────────────────────────────────────────────────────────────
-class Usuario(UserMixin, db.Model):
-    __tablename__ = 'usuarios'
+# Configuração do Flask-Login para proteger as páginas
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login_page' # Redireciona pra cá se não estiver logado
+
+# ==========================================
+# 2. MODELOS DE DADOS (Tabelas do Banco)
+# ==========================================
+
+class Usuario(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    senha_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='gestor')
-    ativo = db.Column(db.Integer, default=1)
+    password = db.Column(db.String(255), nullable=False)
 
 class Setor(db.Model):
-    __tablename__ = 'setores'
     id = db.Column(db.Integer, primary_key=True)
     sigla = db.Column(db.String(10), unique=True, nullable=False)
     nome = db.Column(db.String(100), nullable=False)
+    # Relação: Um setor pode ter vários colaboradores vinculados
     colaboradores = db.relationship('Colaborador', backref='setor', lazy=True)
 
 class Colaborador(db.Model):
-    __tablename__ = 'colaboradores'
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
-    cargo = db.Column(db.String(50), nullable=False, default='analista') # NOVO CAMPO
-    setor_id = db.Column(db.Integer, db.ForeignKey('setores.id'), nullable=False)
-    ativo = db.Column(db.Integer, default=1)
-    registros = db.relationship('Registro', backref='colaborador', cascade="all, delete-orphan", lazy=True)
+    cargo = db.Column(db.String(50), nullable=False)
+    setor_id = db.Column(db.Integer, db.ForeignKey('setor.id'), nullable=False)
 
-class Treinamento(db.Model):
-    __tablename__ = 'treinamentos'
-    id = db.Column(db.Integer, primary_key=True)
-    codigo = db.Column(db.String(100), nullable=False)
-    departamentos = db.Column(db.String(200), nullable=False)
-    sigla_doc = db.Column(db.String(50))
-    data_aprovacao = db.Column(db.String(20))
-    obs = db.Column(db.Text)
-    registros = db.relationship('Registro', backref='treinamento', cascade="all, delete-orphan", lazy=True)
-    @property
-    def nome(self): return self.codigo
+# (Se houver modelos de Treinamento e Matriz, pode adicionar abaixo futuramente)
 
-class Registro(db.Model):
-    __tablename__ = 'registros'
-    id = db.Column(db.Integer, primary_key=True)
-    colaborador_id = db.Column(db.Integer, db.ForeignKey('colaboradores.id'), nullable=False)
-    treinamento_id = db.Column(db.Integer, db.ForeignKey('treinamentos.id'), nullable=False)
-    data_realizacao = db.Column(db.String(20))
-    na = db.Column(db.Integer, default=0)
-    __table_args__ = (db.UniqueConstraint('colaborador_id', 'treinamento_id', name='_colab_treino_uc'),)
-
-# ── FUNÇÕES GLOBAIS ───────────────────────────────────────────────────────────
-def status_treinamento(data_aprovacao, data_realizacao, na):
-    if na: return "NA"
-    if not data_realizacao: return "não realizado"
-    if not data_aprovacao: return "válido"
-    try:
-        dt_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d").date()
-        dt_real  = datetime.strptime(data_realizacao, "%Y-%m-%d").date()
-        return "pendente" if dt_aprov > dt_real else "válido"
-    except: return "não realizado"
-
+# Carregador de usuário para o Flask-Login saber quem está logado na sessão
 @login_manager.user_loader
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-@app.context_processor
-def inject_globals():
-    return dict(all_setores=Setor.query.order_by(Setor.sigla).all(), current_user=current_user, status_treinamento=status_treinamento)
+# Cria as tabelas do SQLite magicamente se elas ainda não existirem
+with app.app_context():
+    db.create_all()
 
-def admin_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != "admin":
-            flash("Acesso negado.", "error")
-            return redirect(url_for("index"))
-        return f(*args, **kwargs)
-    return wrapper
 
-# ── AUTENTICAÇÃO ──────────────────────────────────────────────────────────────
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if current_user.is_authenticated: return redirect(url_for("index"))
-    if request.method == "POST":
-        login_input = (request.form.get("login") or request.form.get("email") or "").strip()
-        senha_input = request.form.get("senha") or request.form.get("password")
-        user = Usuario.query.filter_by(email="admin@empresa.com" if login_input=="admin" else login_input, ativo=1).first()
-        if user and check_password_hash(user.senha_hash, senha_input):
-            login_user(user)
-            return redirect(url_for("index"))
-        flash("Credenciais incorretas.", "error")
-    return render_template("login.html")
+# ==========================================
+# 3. ROTAS DE AUTENTICAÇÃO E LOGIN
+# ==========================================
 
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for("login"))
+@app.route('/login')
+def login_page():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template('login.html')
 
-# ── ROTAS PRINCIPAIS ──────────────────────────────────────────────────────────
-@app.route("/")
-@login_required
-def index():
-    registros = db.session.query(Registro.na, Registro.data_realizacao, Treinamento.data_aprovacao).join(Treinamento).all()
-    c = {"válido": 0, "não realizado": 0, "pendente": 0, "NA": 0}
-    for r in registros:
-        s = status_treinamento(r.data_aprovacao, r.data_realizacao, r.na)
-        if s in c: c[s] += 1
-    return render_template("index.html", t_validos=c["válido"], t_pendentes=c["não realizado"] + c["pendente"], total=Treinamento.query.count())
-
-@app.route("/colaboradores")
-@login_required
-def colaboradores():
-    pesquisa = request.args.get("busca_nome", "").strip()
-    query = Colaborador.query.filter_by(ativo=1)
-    if pesquisa: query = query.filter(Colaborador.nome.like(f"%{pesquisa}%"))
-    return render_template("colaboradores.html", colaboradores=query.join(Setor).order_by(Colaborador.nome).all())
-
-@app.route("/colaboradores/novo", methods=["POST"])
-@login_required
-def novo_colaborador():
-    db.session.add(Colaborador(nome=request.form["nome"].strip(), setor_id=int(request.form["setor_id"]), cargo=request.form["cargo"]))
-    db.session.commit()
-    flash("Colaborador cadastrado.", "ok")
-    return redirect(url_for("colaboradores"))
-
-# ABA INDIVIDUAL DO COLABORADOR
-@app.route("/colaborador/<int:cid>")
-@login_required
-def aba_colaborador(cid):
-    c = Colaborador.query.get_or_404(cid)
-    treinos = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() if c.setor.sigla in [x.strip() for x in t.departamentos.split(",")]]
-    registros = Registro.query.filter_by(colaborador_id=c.id).all()
-    return render_template("colaborador.html", colab=c, treinamentos_setor=treinos, matriz_dados=registros)
-
-@app.route("/setor/<sigla>")
-@login_required
-def setor(sigla):
-    s = Setor.query.filter_by(sigla=sigla).first_or_404()
-    colabs = Colaborador.query.filter_by(setor_id=s.id, ativo=1).order_by(Colaborador.nome).all()
-    treinos = [t for t in Treinamento.query.order_by(Treinamento.codigo).all() if sigla in [x.strip() for x in t.departamentos.split(",")]]
-    registros = Registro.query.filter(Registro.colaborador_id.in_([c.id for c in colabs])).all() if colabs else []
-    return render_template("setor.html", setor=s, colaboradores_setor=colabs, treinamentos_setor=treinos, matriz_dados=registros)
-
-# ROTA DO FUNIL (AJAX)
-@app.route("/api/funil_colaboradores")
-@login_required
-def funil_colabs():
-    setor_id = request.args.get("setor_id")
-    cargo = request.args.get("cargo")
-    query = Colaborador.query.filter_by(ativo=1)
-    if setor_id: query = query.filter_by(setor_id=int(setor_id))
-    if cargo: query = query.filter_by(cargo=cargo)
-    
-    resultados = [{"id": c.id, "nome": c.nome, "cargo": c.cargo.title()} for c in query.order_by(Colaborador.nome).all()]
-    return jsonify(resultados)
-
-# ROTA DE REGISTRO UNIFICADA (COM FORÇAR ATUALIZAÇÃO)
-@app.route("/registro/salvar", methods=["POST"])
-@login_required
-def salvar_registro():
+@app.route('/api/login', methods=['POST'])
+def api_login():
     try:
-        cid, tid = int(request.form.get("colab_id")), int(request.form.get("treino_id"))
-        data_real = request.form.get("data_realizacao") or None
-        na = 1 if request.form.get("na") else 0
-        forcar_atualizacao = request.form.get("atualizar") # Checagem do Switch
+        data = request.get_json() if request.is_json else request.form
+        email = data.get('email')
+        password = data.get('password')
 
-        if forcar_atualizacao: # Se marcou, invalida o treinamento imediatamente
-            data_real = None
-            na = 0
-
-        reg = Registro.query.filter_by(colaborador_id=cid, treinamento_id=tid).first()
-        if reg:
-            reg.data_realizacao, reg.na = data_real, na
+        user = Usuario.query.filter_by(email=email).first()
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            return jsonify({"success": True}), 200
         else:
-            db.session.add(Registro(colaborador_id=cid, treinamento_id=tid, data_realizacao=data_real, na=na))
-            
+            return jsonify({"error": "E-mail ou senha incorretos."}), 401
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    try:
+        data = request.get_json() if request.is_json else request.form
+        nome = data.get('nome')
+        email = data.get('email')
+        password = data.get('password')
+
+        # Proteção contra e-mails duplicados
+        if Usuario.query.filter_by(email=email).first():
+            return jsonify({"error": "E-mail já cadastrado"}), 400
+
+        novo_usuario = Usuario(
+            nome=nome,
+            email=email,
+            password=generate_password_hash(password) # Senha criptografada!
+        )
+        db.session.add(novo_usuario)
         db.session.commit()
-        return jsonify({"ok": True})
+        
+        login_user(novo_usuario) # Faz o login automático após registrar
+        return jsonify({"success": True}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-with app.app_context():
-    db.create_all()
-    if not Usuario.query.first():
-        db.session.add(Usuario(nome="Admin", email="admin@empresa.com", senha_hash=generate_password_hash("admin123"), role="admin"))
-        db.session.commit()
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login_page'))
 
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+
+# ==========================================
+# 4. ROTAS DA APLICAÇÃO (Protegidas)
+# ==========================================
+
+@app.route('/')
+@login_required
+def index():
+    # Passando setores para a dashboard caso seja necessário renderizar os blocos
+    setores = Setor.query.all()
+    return render_template('index.html', setores=setores)
+
+@app.route('/colaboradores')
+@login_required
+def colaboradores_page():
+    # Pega todos os setores do banco e passa para o formulário
+    setores = Setor.query.all()
+    return render_template('colaboradores.html', setores=setores)
+
+@app.route('/treinamentos')
+@login_required
+def treinamentos_page():
+    return render_template('treinamentos.html')
+
+
+# ==========================================
+# 5. ROTAS DE CADASTRO DE DADOS (APIs)
+# ==========================================
+
+@app.route('/api/setor/cadastrar', methods=['POST'])
+@login_required
+def api_cadastrar_setor():
+    try:
+        sigla = request.form.get('sigla').upper()
+        nome = request.form.get('nome')
+        
+        if Setor.query.filter_by(sigla=sigla).first():
+            return "Setor já existe", 400
+
+        novo_setor = Setor(sigla=sigla, nome=nome)
+        db.session.add(novo_setor)
+        db.session.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return str(e), 500
+
+@app.route('/api/colaborador/cadastrar', methods=['POST'])
+@login_required
+def api_cadastrar_colaborador():
+    try:
+        nome = request.form.get('nome')
+        cargo = request.form.get('cargo')
+        setor_id = request.form.get('setor_id')
+
+        novo_colaborador = Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id))
+        db.session.add(novo_colaborador)
+        db.session.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return str(e), 500
+
+
+# ==========================================
+# 6. INICIAR A APLICAÇÃO
+# ==========================================
+if __name__ == '__main__':
+    # Rodar em modo Debug na porta 5000
+    app.run(debug=True, host='0.0.0.0', port=5000)
