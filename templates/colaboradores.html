@@ -1,54 +1,76 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap;">
-    <div class="card-box" style="flex: 1; min-width: 300px;">
-        <h3>Novo Colaborador</h3>
-        <form action="/colaboradores/novo" method="POST">
-            <label>Nome Completo</label>
-            <input type="text" name="nome" class="form-control" required>
-            
-            <label>Setor de Atuação</label>
-            <select name="setor_id" class="form-control" required>
-                {% for s in all_setores %}<option value="{{ s.id }}">{{ s.sigla }} - {{ s.nome }}</option>{% endfor %}
-            </select>
 
-            <label>Cargo / Nível</label>
+<div class="info-box">
+    <strong>Dica Importante:</strong> Para alocar um novo colaborador corretamente na Matriz de Versatilidade, certifique-se de que o <b>Setor</b> correspondente já esteja criado. Utilize os painéis abaixo para gerenciar sua hierarquia departamental.
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+
+    <div class="card-box">
+        <h3 style="margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">Cadastrar Novo Colaborador</h3>
+        <form id="formColaborador">
+            <label style="font-weight: 500; color: var(--text-dim);">Nome Completo</label>
+            <input type="text" name="nome" class="form-control" required placeholder="Ex: João da Silva">
+            
+            <label style="font-weight: 500; color: var(--text-dim);">Cargo</label>
             <select name="cargo" class="form-control" required>
+                <option value="">Selecione o nível...</option>
                 <option value="estagiário">Estagiário</option>
                 <option value="aprendiz">Aprendiz</option>
-                <option value="analista" selected>Analista</option>
+                <option value="analista">Analista / Assistente</option>
                 <option value="técnico">Técnico</option>
-                <option value="coordenador">Coordenador</option>
+                <option value="coordenador">Coordenador / Gestor</option>
             </select>
-            
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Cadastrar Colaborador</button>
+
+            <label style="font-weight: 500; color: var(--text-dim);">Setor de Atuação</label>
+            <select name="setor_id" class="form-control" required>
+                <option value="">Selecione o setor...</option>
+                {% for s in setores %}
+                    <option value="{{ s.id }}">{{ s.sigla }} - {{ s.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Adicionar Colaborador</button>
         </form>
     </div>
 
-    <div class="card-box" style="flex: 2; min-width: 400px; overflow-x: auto;">
-        <h3>Equipe Registrada</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Nome</th>
-                    <th>Setor</th>
-                    <th>Cargo</th>
-                    <th style="text-align: right;">Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in colaboradores %}
-                <tr>
-                    <td style="font-weight: 500;">{{ c.nome }}</td>
-                    <td><span class="status-badge" style="background: var(--border); color: var(--text);">{{ c.setor.sigla }}</span></td>
-                    <td style="text-transform: capitalize; color: var(--text-dim);">{{ c.cargo }}</td>
-                    <td style="text-align: right;">
-                        <a href="/colaborador/{{ c.id }}" class="btn" style="font-size: 12px;">Aba Individual</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card-box">
+        <h3 style="margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">Cadastrar Novo Setor</h3>
+        <form id="formSetor">
+            <label style="font-weight: 500; color: var(--text-dim);">Sigla do Setor</label>
+            <input type="text" name="sigla" class="form-control" required placeholder="Ex: TI, RH, QUA" maxlength="5" style="text-transform: uppercase;">
+            
+            <label style="font-weight: 500; color: var(--text-dim);">Nome do Setor</label>
+            <input type="text" name="nome" class="form-control" required placeholder="Ex: Tecnologia da Informação">
+            
+            <button type="submit" class="btn" style="width: 100%; margin-top: 8px; border-color: var(--primary); color: var(--primary);">Registrar Setor</button>
+        </form>
     </div>
+
 </div>
+
+<script>
+    // Submissão do Colaborador
+    document.getElementById('formColaborador').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = new URLSearchParams(new FormData(e.target));
+        try {
+            const res = await fetch('/api/colaborador/cadastrar', { method: 'POST', body: data });
+            if(res.ok) window.location.reload();
+            else alert('Erro ao cadastrar colaborador.');
+        } catch(err) { alert('Falha de conexão.'); }
+    });
+
+    // Submissão do Novo Setor
+    document.getElementById('formSetor').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = new URLSearchParams(new FormData(e.target));
+        try {
+            const res = await fetch('/api/setor/cadastrar', { method: 'POST', body: data });
+            if(res.ok) window.location.reload();
+            else alert('Erro ao cadastrar setor. Verifique se a sigla já existe.');
+        } catch(err) { alert('Falha de conexão.'); }
+    });
+</script>
 {% endblock %}
