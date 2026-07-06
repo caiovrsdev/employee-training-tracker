@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card-box" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary);">
+    <div>
+        <h2 style="margin: 0; color: var(--text);">{{ colab.nome }}</h2>
+        <div style="font-size: 14px; color: var(--text-dim); margin-top: 4px;">
+            Setor: <b>{{ colab.setor.sigla }}</b> | Cargo: <b style="text-transform: capitalize;">{{ colab.cargo }}</b>
+        </div>
+    </div>
+    <a href="/setor/{{ colab.setor.sigla }}" class="btn">Voltar para Setor</a>
+</div>
+
+<div class="card-box" style="padding: 0; overflow: hidden;">
+    <table>
+        <thead>
+            <tr>
+                <th style="min-width: 300px;">Treinamento Exigido</th>
+                <th style="width: 150px; text-align: center;">Validade / Data</th>
+                <th style="width: 150px; text-align: center;">Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in treinamentos_setor %}
+                {% set ns = namespace(data=none, status='vazio', is_na=0) %}
+                
+                {% for r in matriz_dados %}
+                    {% if r.treinamento_id == t.id %}
+                        {% set ns.is_na = r.na %}
+                        {% if r.na == 1 %}
+                            {% set ns.status = 'na' %}
+                        {% else %}
+                            {% set ns.data = r.data_realizacao %}
+                            {% set ns.status = status_treinamento(t.data_aprovacao, r.data_realizacao, r.na) %}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+
+            <tr>
+                <td>
+                    <div style="font-weight: 600; color: var(--text);">{{ t.nome }}</div>
+                    <div style="font-size: 11px; color: var(--text-dim);">Doc: {{ t.sigla_doc or 'N/A' }} | Emissão: {{ t.data_aprovacao or '--' }}</div>
+                </td>
+                
+                <td style="text-align: center;">
+                    {% if ns.status == 'válido' %}
+                        <div class="status-badge valido">Válido</div>
+                        <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">{{ ns.data }}</div>
+                    {% elif ns.status == 'pendente' %}
+                        <div class="status-badge pendente">Pendente</div>
+                        <div style="font-size: 11px; color: var(--red); margin-top: 4px;">Exp: {{ ns.data }}</div>
+                    {% elif ns.status == 'na' %}
+                        <div class="status-badge" style="background: var(--border); color: var(--text-dim);">NA</div>
+                    {% else %}
+                        <div class="status-badge vazio">Não Realizado</div>
+                    {% endif %}
+                </td>
+                
+                <td style="text-align: center;">
+                    <button class="btn matrix-cell" 
+                            style="font-size: 12px; border-color: var(--primary); color: var(--primary);"
+                            data-colab-id="{{ colab.id }}" 
+                            data-treino-id="{{ t.id }}"
+                            data-current-date="{{ ns.data or '' }}"
+                            data-current-na="{{ ns.is_na }}">
+                        Registrar
+                    </button>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="text-align: center; padding: 32px; color: var(--text-dim);">Nenhum treinamento exigido para este setor.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
