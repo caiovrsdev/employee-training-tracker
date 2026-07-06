@@ -1,41 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px;">
-    <div class="card-box" style="cursor: pointer; border-left: 4px solid var(--primary);" onclick="abrirFunil('todos')">
-        <h3 style="margin: 0; color: var(--text-dim);">Total Treinamentos</h3>
-        <p style="font-size: 32px; font-weight: 700; margin: 8px 0 0 0;">{{ total }}</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 48px;">
+    <div class="card-box" style="cursor: pointer; text-align: center;" onclick="abrirFunil('todos')">
+        <h3 style="margin: 0; color: var(--text-dim); font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Total Treinamentos</h3>
+        <p style="font-size: 40px; font-weight: 700; margin: 8px 0 0 0; color: var(--text);">{{ total }}</p>
     </div>
-    <div class="card-box" style="cursor: pointer; border-left: 4px solid var(--green);" onclick="abrirFunil('valido')">
-        <h3 style="margin: 0; color: var(--text-dim);">Registros Válidos</h3>
-        <p style="font-size: 32px; font-weight: 700; margin: 8px 0 0 0; color: var(--green);">{{ t_validos }}</p>
+    <div class="card-box" style="cursor: pointer; text-align: center;" onclick="abrirFunil('valido')">
+        <h3 style="margin: 0; color: var(--text-dim); font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Registros Válidos</h3>
+        <p style="font-size: 40px; font-weight: 700; margin: 8px 0 0 0; color: var(--green);">{{ t_validos }}</p>
     </div>
-    <div class="card-box" style="cursor: pointer; border-left: 4px solid var(--red);" onclick="abrirFunil('pendente')">
-        <h3 style="margin: 0; color: var(--text-dim);">Pendentes / Vencidos</h3>
-        <p style="font-size: 32px; font-weight: 700; margin: 8px 0 0 0; color: var(--red);">{{ t_pendentes }}</p>
+    <div class="card-box" style="cursor: pointer; text-align: center;" onclick="abrirFunil('pendente')">
+        <h3 style="margin: 0; color: var(--text-dim); font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Pendentes / Vencidos</h3>
+        <p style="font-size: 40px; font-weight: 700; margin: 8px 0 0 0; color: var(--red);">{{ t_pendentes }}</p>
     </div>
 </div>
 
-<h2 style="margin-bottom: 20px;">Painel de Setores</h2>
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Painel de Setores</h2>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px;">
     {% for s in all_setores %}
     <a href="/setor/{{ s.sigla }}" style="text-decoration: none;">
-        <div class="card-box" style="text-align: center; padding: 20px 10px; transition: transform 0.2s;">
-            <div style="font-size: 24px; font-weight: 700; color: var(--primary);">{{ s.sigla }}</div>
-            <div style="font-size: 12px; color: var(--text-dim); margin-top: 8px;">Acessar Matriz</div>
+        <div class="card-box" style="text-align: center; padding: 24px 16px;">
+            <div style="font-size: 28px; font-weight: 700; color: var(--primary);">{{ s.sigla }}</div>
+            <div style="font-size: 12px; font-weight: 500; color: var(--text-dim); margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Acessar Matriz</div>
         </div>
     </a>
     {% endfor %}
 </div>
 
-<div id="funilModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+<div id="funilModal" class="modal-overlay">
     <div class="card-box" style="width: 400px; max-width: 90%;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 id="funilTitle" style="margin: 0;">Filtrar Equipe</h3>
-            <button onclick="fecharFunil()" style="background: transparent; border: none; font-size: 20px; cursor: pointer; color: var(--text);">✖</button>
+            <h3 id="funilTitle" style="margin: 0; font-size: 18px;">Filtrar Equipe</h3>
+            <button onclick="fecharFunil()" style="background: transparent; border: none; font-size: 20px; cursor: pointer; color: var(--text-dim); hover: color: var(--text);">✖</button>
         </div>
 
         <div id="funilStep1">
-            <label>1. Qual setor você quer ver?</label>
+            <label style="font-size: 13px; font-weight: 500; color: var(--text-dim);">1. Qual setor você quer ver?</label>
             <select id="funilSetor" class="form-control" style="margin-top: 8px;">
                 <option value="">-- Todos os Setores --</option>
                 {% for s in all_setores %}<option value="{{ s.id }}">{{ s.sigla }} - {{ s.nome }}</option>{% endfor %}
@@ -44,7 +47,7 @@
         </div>
 
         <div id="funilStep2" style="display: none;">
-            <label>2. Qual o nível do cargo?</label>
+            <label style="font-size: 13px; font-weight: 500; color: var(--text-dim);">2. Qual o nível do cargo?</label>
             <select id="funilCargo" class="form-control" style="margin-top: 8px;">
                 <option value="">-- Todos os Cargos --</option>
                 <option value="estagiário">Estagiário</option>
@@ -60,7 +63,7 @@
         </div>
 
         <div id="funilStep3" style="display: none;">
-            <p style="font-size: 13px; color: var(--text-dim);">Selecione o colaborador para ver a aba individual.</p>
+            <p style="font-size: 13px; color: var(--text-dim); margin-top: 0;">Selecione o colaborador para ver a matriz.</p>
             <div id="funilResultados" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
                 </div>
             <button class="btn" style="width: 100%; margin-top: 16px;" onclick="irParaStep(2)">⬅ Refazer Filtro</button>
@@ -89,7 +92,7 @@
     async function carregarResultadosFunil() {
         irParaStep(3);
         const container = document.getElementById('funilResultados');
-        container.innerHTML = '<div style="text-align:center; padding: 20px;">Buscando...</div>';
+        container.innerHTML = '<div style="text-align:center; padding: 20px; font-size: 14px; color: var(--text-dim);">Buscando...</div>';
         
         const sid = document.getElementById('funilSetor').value;
         const cargo = document.getElementById('funilCargo').value;
@@ -99,7 +102,7 @@
         
         container.innerHTML = '';
         if(data.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">Nenhum colaborador encontrado.</div>';
+            container.innerHTML = '<div style="text-align:center; padding: 20px; font-size: 14px; color: var(--text-dim);">Nenhum colaborador encontrado.</div>';
             return;
         }
 
@@ -110,7 +113,7 @@
             el.style.textAlign = 'left';
             el.style.display = 'flex';
             el.style.justifyContent = 'space-between';
-            el.innerHTML = `<span>${c.nome}</span> <span style="font-size: 11px; color: var(--text-dim);">${c.cargo}</span>`;
+            el.innerHTML = `<span style="font-weight: 500;">${c.nome}</span> <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim);">${c.cargo}</span>`;
             container.appendChild(el);
         });
     }
