@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ==========================================
 # 1. INFRAESTRUTURA E CONFIGURAÇÃO ABSOLUTA
 # ==========================================
-app = Flask(name)
+app = Flask(__name__)  # CORRIGIDO: __name__ com underlines estruturais
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -106,7 +106,6 @@ def treinamentos_page():
         colaboradores=Colaborador.query.all()
     )
 
-# Blindagem contra Erro 500: Enviando os contextos que o formulário HTML exige para renderizar os seletores
 @app.route('/treinamentos/novo')
 @login_required
 def novo_treinamento():
@@ -163,7 +162,7 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 6. APIs DE CADASTRO COESAS
+# 6. APIs DE CADASTRO
 # ==========================================
 @app.route('/api/setor/cadastrar', methods=['POST'])
 @app.route('/api/setor', methods=['POST'])
@@ -188,26 +187,30 @@ def api_setor():
         db.session.rollback()
         return jsonify({"error": "Erro de gravacao."}), 500
 
-# Correção do Erro 404: Mapeando a rota exata de cadastro disparada pelo JS do Colaborador
 @app.route('/api/colaborador/cadastrar', methods=['POST'])
 @app.route('/api/colaborador', methods=['POST'])
 @login_required
 def api_colaborador():
     data = request.get_json(silent=True) or request.form or {}
     
+    # Logger preventivo para inspecionar no Render exatamente o que o frontend está cuspindo
+    print(f"--- LOG DE ENTRADA COLABORADOR --- Payload recebido: {dict(data)}", file=sys.stderr)
+    
     nome = (data.get('nome') or data.get('txt_nome') or data.get('txtColaborador') or data.get('name') or '').strip()
     cargo = (data.get('cargo') or data.get('txt_cargo') or data.get('txtCargo') or data.get('funcao') or '').strip()
     setor_id = data.get('setor_id') or data.get('txt_setor_id') or data.get('setor') or data.get('sel_setor')
 
     if not all([nome, cargo, setor_id]):
+        print(f"--- ERRO VALIDACAO COLABORADOR --- Nome: {bool(nome)}, Cargo: {bool(cargo)}, Setor ID: {bool(setor_id)}", file=sys.stderr)
         return jsonify({"error": "Dados de colaborador incompletos."}), 400
 
     try:
         db.session.add(Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id)))
         db.session.commit()
         return jsonify({"success": True}), 201
-    except Exception:
+    except Exception as err:
         db.session.rollback()
+        print(f"--- ERRO DB COLABORADOR --- Detalhes: {str(err)}", file=sys.stderr)
         return jsonify({"error": "Erro de gravacao."}), 500
 
 if __name__ == '__main__':
