@@ -7,16 +7,14 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # ==========================================
-# 1. INFRAESTRUTURA E CONFIGURAÇÃO
+# 1. INFRAESTRUTURA E CONFIGURAÇÃO ABSOLUTA
 # ==========================================
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
-# Auto-Correção: Nova nomenclatura isolada para forçar uma base limpa de dados
+# Isolamento total: ignora o ecossistema do Render e força um arquivo limpo na raiz
 basedir = os.path.abspath(os.path.dirname(__file__))
-default_db_url = f"sqlite:///{os.path.join(basedir, 'ecolyzer_final_v3.db')}"
-
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_db_url)
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v3_clean.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -24,38 +22,27 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
 # ==========================================
-# 2. INTERCEPTOR DE ERROS GLOBAL
-# ==========================================
-@app.errorhandler(Exception)
-def handle_backend_exception(e):
-    print("\n" + "="*50, file=sys.stderr)
-    print("FALHA CRITICA INTERNA DETECTADA", file=sys.stderr)
-    traceback.print_exc(file=sys.stderr)
-    print("="*50 + "\n", file=sys.stderr)
-    return jsonify({
-        "error": "Erro interno de processamento no servidor.",
-        "details": str(e)
-    }), 500
-
-# ==========================================
-# 3. CAMADA DE COMPATIBILIDADE LEGADA (MIXIN)
+# 2. CAMADA DE COMPATIBILIDADE TRANSICIONAL
 # ==========================================
 class LegacyTemplateMixin:
     """
-    Mixin Senior: Permite que os modelos do SQLAlchemy funcionem de forma transparente
-    caso os templates HTML antigos (Jinja2) acessem os dados como dicionarios ou tuplas.
+    Mixin de Proteção: Garante integridade se o Jinja2 tentar acessar os
+    novos objetos como se fossem tuplas (índices) ou dicionários do SQLite antigo.
     """
     def __getitem__(self, key):
         if isinstance(key, int):
-            columns = [c.key for c in self.__table__.columns]
-            return getattr(self, columns[key])
-        return getattr(self, key)
+            try:
+                columns = [c.key for c in self.__table__.columns]
+                return getattr(self, columns[key], "")
+            except Exception:
+                return ""
+        return getattr(self, key, "")
 
     def get(self, key, default=None):
         return getattr(self, key, default)
 
 # ==========================================
-# 4. MODELOS DE PERSISTÊNCIA (DATA SCHEMA)
+# 3. MODELOS DE PERSISTÊNCIA
 # ==========================================
 class Usuario(db.Model, UserMixin, LegacyTemplateMixin):
     __tablename__ = 'usuarios'
@@ -96,7 +83,7 @@ with app.app_context():
     db.create_all()
 
 # ==========================================
-# 5. INTERFACES WEB (VIEWS)
+# 4. INTERFACES WEB (ROTAS GET)
 # ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -125,7 +112,7 @@ def treinamentos_page():
     )
 
 # ==========================================
-# 6. APIs DE AUTENTICAÇÃO
+# 5. ENDPOINTS DE AUTENTICAÇÃO
 # ==========================================
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -148,7 +135,7 @@ def api_register():
     password = data.get('password', '')
 
     if not nome or not email or not password:
-        return jsonify({"error": "Dados incompletos para registro."}), 400
+        return jsonify({"error": "Dados incompletos."}), 400
 
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": "E-mail ja cadastrado."}), 409
@@ -161,7 +148,7 @@ def api_register():
         return jsonify({"success": True}), 201
     except Exception:
         db.session.rollback()
-        raise
+        return jsonify({"error": "Falha no banco de dados."}), 500
 
 @app.route('/logout')
 @login_required
@@ -170,17 +157,19 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 7. APIs DE CADASTRO DE RECURSOS
+# 6. APIs DE CADASTRO (VARREDURA TOLERANTE)
 # ==========================================
 @app.route('/api/setor', methods=['POST'])
 @login_required
 def api_setor():
     data = request.get_json(silent=True) or request.form or {}
-    sigla = (data.get('sigla') or data.get('txt_sigla', '')).strip().upper()
-    nome = (data.get('nome') or data.get('txt_nome', '')).strip()
+    
+    # Varredura dinâmica de chaves para aceitar qualquer nome estruturado no HTML antigo
+    sigla = (data.get('sigla') or data.get('txt_sigla') or data.get('txtSigla') or data.get('sigla_setor') or '').strip().upper()
+    nome = (data.get('nome') or data.get('txt_nome') or data.get('txtNome') or data.get('nome_setor') or data.get('name') or '').strip()
     
     if not sigla or not nome:
-        return jsonify({"error": "Campos obrigatorios ausentes."}), 400
+        return jsonify({"error": "Campos obrigatorios nao identificados."}), 400
         
     if Setor.query.filter_by(sigla=sigla).first():
         return jsonify({"error": "O setor ja existe."}), 409
@@ -191,18 +180,19 @@ def api_setor():
         return jsonify({"success": True}), 201
     except Exception:
         db.session.rollback()
-        raise
+        return jsonify({"error": "Erro de gravacao."}), 500
 
 @app.route('/api/colaborador', methods=['POST'])
 @login_required
 def api_colaborador():
     data = request.get_json(silent=True) or request.form or {}
-    nome = data.get('nome', '').strip()
-    cargo = data.get('cargo', '').strip()
-    setor_id = data.get('setor_id')
+    
+    nome = (data.get('nome') or data.get('txt_nome') or data.get('txtColaborador') or data.get('name') or '').strip()
+    cargo = (data.get('cargo') or data.get('txt_cargo') or data.get('txtCargo') or data.get('funcao') or '').strip()
+    setor_id = data.get('setor_id') or data.get('txt_setor_id') or data.get('setor') or data.get('sel_setor')
 
     if not all([nome, cargo, setor_id]):
-        return jsonify({"error": "Dados incompletos para colaborador."}), 400
+        return jsonify({"error": "Dados de colaborador incompletos."}), 400
 
     try:
         db.session.add(Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id)))
@@ -210,7 +200,7 @@ def api_colaborador():
         return jsonify({"success": True}), 201
     except Exception:
         db.session.rollback()
-        raise
+        return jsonify({"error": "Erro de gravacao."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
