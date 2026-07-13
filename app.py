@@ -12,19 +12,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///treinamentos.db')
+# Engenharia de Caminho Absoluto com nomenclatura rotacionada (v2)
+basedir = os.path.abspath(os.path.dirname(__file__))
+default_db_url = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v2.db')}"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_db_url)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
-
 # ==========================================
-# 2. INTERCEPTOR DE ERROS (DEBUGGER SÊNIOR)
+# 2. INTERCEPTOR DE ERROS (LOGS NO TERMINAL)
 # ==========================================
 @app.errorhandler(Exception)
 def handle_backend_exception(e):
-    """Captura qualquer falha interna e printa o traceback real no terminal."""
     print("\n" + "="*50, file=sys.stderr)
     print("EXCEÇÃO DETECTADA NO BACKEND DA APLICAÇÃO", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
@@ -65,14 +67,13 @@ class Treinamento(db.Model):
     nome = db.Column(db.String(200), nullable=False)
     data_realizacao = db.Column(db.String(20), nullable=True)
     validade = db.Column(db.String(20), nullable=True)
-    status = db.Column(db.String(50), nullable=True)  # Valido / Pendente / Nao Realizado
+    status = db.Column(db.String(50), nullable=True)
     colaborador_id = db.Column(db.Integer, db.ForeignKey('colaboradores.id'), nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-# Inicialização limpa do esquema
 with app.app_context():
     db.create_all()
 
@@ -98,7 +99,6 @@ def colaboradores_page():
 @app.route('/treinamentos')
 @login_required
 def treinamentos_page():
-    # Injeção correta de dados para suprir as iterações dos templates HTML da matriz
     return render_template(
         'treinamentos.html', 
         setores=Setor.query.all(), 
