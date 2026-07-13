@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ==========================================
 # 1. INFRAESTRUTURA E CONFIGURAÇÃO ABSOLUTA
 # ==========================================
-app = Flask(__name__)
+app = Flask(name)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -106,11 +106,16 @@ def treinamentos_page():
         colaboradores=Colaborador.query.all()
     )
 
-# Correção do BuildError: Criação do endpoint exigido pelo template 'treinamentos.html'
+# Blindagem contra Erro 500: Enviando os contextos que o formulário HTML exige para renderizar os seletores
 @app.route('/treinamentos/novo')
 @login_required
 def novo_treinamento():
-    return render_template('novo_treinamento.html')
+    return render_template(
+        'novo_treinamento.html',
+        setores=Setor.query.all(),
+        colaboradores=Colaborador.query.all(),
+        treinamentos=Treinamento.query.all()
+    )
 
 # ==========================================
 # 5. ENDPOINTS DE AUTENTICAÇÃO
@@ -158,10 +163,8 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 6. APIs DE CADASTRO
+# 6. APIs DE CADASTRO COESAS
 # ==========================================
-
-# Correção do Erro 404: Mapeado exatamente para a rota acionada pelo seu frontend JS
 @app.route('/api/setor/cadastrar', methods=['POST'])
 @app.route('/api/setor', methods=['POST'])
 @login_required
@@ -185,6 +188,8 @@ def api_setor():
         db.session.rollback()
         return jsonify({"error": "Erro de gravacao."}), 500
 
+# Correção do Erro 404: Mapeando a rota exata de cadastro disparada pelo JS do Colaborador
+@app.route('/api/colaborador/cadastrar', methods=['POST'])
 @app.route('/api/colaborador', methods=['POST'])
 @login_required
 def api_colaborador():
