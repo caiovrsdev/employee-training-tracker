@@ -1,6 +1,4 @@
 import os
-import sys
-import traceback
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -12,63 +10,34 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
-# Engenharia de Caminho Absoluto com nomenclatura rotacionada (v2)
-basedir = os.path.abspath(os.path.dirname(__file__))
-default_db_url = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v2.db')}"
-
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_db_url)
+# Mantida a compatibilidade com a base original de treinamentos
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///treinamentos.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
-# ==========================================
-# 2. INTERCEPTOR DE ERROS (LOGS NO TERMINAL)
-# ==========================================
-@app.errorhandler(Exception)
-def handle_backend_exception(e):
-    print("\n" + "="*50, file=sys.stderr)
-    print("EXCEÇÃO DETECTADA NO BACKEND DA APLICAÇÃO", file=sys.stderr)
-    traceback.print_exc(file=sys.stderr)
-    print("="*50 + "\n", file=sys.stderr)
-    return jsonify({
-        "error": "Erro interno de processamento no servidor.",
-        "details": str(e)
-    }), 500
 
 # ==========================================
-# 3. MODELOS DE PERSISTÊNCIA (DATA SCHEMA PLURALIZADO)
+# 2. MODELOS DE PERSISTÊNCIA (DATA SCHEMA)
 # ==========================================
 class Usuario(db.Model, UserMixin):
-    __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
 
 class Setor(db.Model):
-    __tablename__ = 'setores'
     id = db.Column(db.Integer, primary_key=True)
     sigla = db.Column(db.String(10), unique=True, nullable=False)
     nome = db.Column(db.String(100), nullable=False)
     colaboradores = db.relationship('Colaborador', backref='setor', lazy=True)
 
 class Colaborador(db.Model):
-    __tablename__ = 'colaboradores'
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     cargo = db.Column(db.String(50), nullable=False)
-    setor_id = db.Column(db.Integer, db.ForeignKey('setores.id'), nullable=False)
-    treinamentos = db.relationship('Treinamento', backref='colaborador', lazy=True)
-
-class Treinamento(db.Model):
-    __tablename__ = 'treinamentos'
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(200), nullable=False)
-    data_realizacao = db.Column(db.String(20), nullable=True)
-    validade = db.Column(db.String(20), nullable=True)
-    status = db.Column(db.String(50), nullable=True)
-    colaborador_id = db.Column(db.Integer, db.ForeignKey('colaboradores.id'), nullable=False)
+    setor_id = db.Column(db.Integer, db.ForeignKey('setor.id'), nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -78,7 +47,7 @@ with app.app_context():
     db.create_all()
 
 # ==========================================
-# 4. INTERFACES WEB (VIEWS)
+# 3. INTERFACES WEB (PROTEÇÃO CONTRA ERRO 500)
 # ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -89,25 +58,26 @@ def login_page():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', setores=Setor.query.all())
+    setores_lista = Setor.query.all() or []
+    return render_template('index.html', setores=setores_lista)
 
 @app.route('/colaboradores')
 @login_required
 def colaboradores_page():
-    return render_template('colaboradores.html', setores=Setor.query.all(), colaboradores=Colaborador.query.all())
+    # Injeção preemptiva de coleções limpas para mitigar quebras no Jinja2
+    setores_lista = Setor.query.all() or []
+    colaboradores_lista = Colaborador.query.all() or []
+    return render_template('colaboradores.html', setores=setores_lista, colaboradores=colaboradores_lista)
 
 @app.route('/treinamentos')
 @login_required
 def treinamentos_page():
-    return render_template(
-        'treinamentos.html', 
-        setores=Setor.query.all(), 
-        treinamentos=Treinamento.query.all(), 
-        colaboradores=Colaborador.query.all()
-    )
+    # Injeção de arrays vazios como contratos de interface com o frontend
+    setores_lista = Setor.query.all() or []
+    return render_template('treinamentos.html', setores=setores_lista, treinamentos=[], colaboradores=[])
 
 # ==========================================
-# 5. APIs DE AUTENTICAÇÃO
+# 4. APIs DE AUTENTICAÇÃO
 # ==========================================
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -130,7 +100,7 @@ def api_register():
     password = data.get('password', '')
 
     if not nome or not email or not password:
-        return jsonify({"error": "Dados incompletos para registro."}), 400
+        return jsonify({"error": "Nome, e-mail e senha sao obrigatorios."}), 400
 
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": "E-mail ja cadastrado."}), 409
@@ -143,7 +113,7 @@ def api_register():
         return jsonify({"success": True}), 201
     except Exception:
         db.session.rollback()
-        raise
+        return jsonify({"error": "Erro interno ao salvar no banco."}), 500
 
 @app.route('/logout')
 @login_required
@@ -152,17 +122,18 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 6. APIs DE CADASTRO DE RECURSOS
+# 5. APIs DE DOMÍNIO (NORMALIZAÇÃO DE DTO)
 # ==========================================
 @app.route('/api/setor', methods=['POST'])
 @login_required
 def api_setor():
+    # Estrutura agnostica: processa requisicoes nativas de form ou payloads JSON via Fetch API
     data = request.get_json() or request.form or {}
     sigla = data.get('sigla', '').strip().upper()
     nome = data.get('nome', '').strip()
     
     if not sigla or not nome:
-        return jsonify({"error": "Campos obrigatorios ausentes."}), 400
+        return jsonify({"error": "Sigla e nome sao obrigatorios."}), 400
         
     if Setor.query.filter_by(sigla=sigla).first():
         return jsonify({"error": "O setor ja existe."}), 409
@@ -173,7 +144,7 @@ def api_setor():
         return jsonify({"success": True}), 201
     except Exception:
         db.session.rollback()
-        raise
+        return jsonify({"error": "Erro ao criar setor."}), 500
 
 @app.route('/api/colaborador', methods=['POST'])
 @login_required
@@ -192,7 +163,7 @@ def api_colaborador():
         return jsonify({"success": True}), 201
     except Exception:
         db.session.rollback()
-        raise
+        return jsonify({"error": "Erro ao adicionar colaborador."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
