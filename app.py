@@ -5,12 +5,13 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # ==========================================
-# 1. SETUP MINIMALISTA E CONFIGURAÇÃO
+# 1. CONFIGURAÇÃO DA INFRAESTRUTURA
 # ==========================================
 app = Flask(__name__)
-# Uso de variáveis de ambiente (preparado para produção/Render)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///ecolyzer.db')
+
+# Mantido o nome original do seu banco para não perder dados locais
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///treinamentos.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -18,7 +19,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
 # ==========================================
-# 2. MODELOS DE DOMÍNIO
+# 2. MODELOS DE BANCO DE DADOS
 # ==========================================
 class Usuario(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -46,7 +47,7 @@ with app.app_context():
     db.create_all()
 
 # ==========================================
-# 3. ROTAS DE AUTENTICAÇÃO (API)
+# 3. INTERFACES E PAGINAÇÃO (ROTAS GET)
 # ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -54,55 +55,6 @@ def login_page():
         return redirect(url_for('index'))
     return render_template('login.html')
 
-@app.route('/api/login', methods=['POST'])
-def api_login():
-    data = request.get_json() or {}
-    user = Usuario.query.filter_by(email=data.get('email', '').strip()).first()
-    
-    if user and check_password_hash(user.password, data.get('password', '')):
-        login_user(user)
-        return jsonify({"success": True}), 200
-        
-    return jsonify({"error": "Credenciais inválidas"}), 401
-
-@app.route('/api/register', methods=['POST'])
-def api_register():
-    data = request.get_json() or {}
-    nome = data.get('nome')
-    email = data.get('email')
-    password = data.get('password')
-
-    # Validação Defensiva (Resolve o erro "NOT NULL constraint failed")
-    if not all([nome, email, password]):
-        return jsonify({"error": "Nome, e-mail e palavra-passe são obrigatórios."}), 400
-
-    if Usuario.query.filter_by(email=email.strip()).first():
-        return jsonify({"error": "E-mail já registado."}), 409
-
-    try:
-        novo_usuario = Usuario(
-            nome=nome.strip(),
-            email=email.strip(),
-            password=generate_password_hash(password)
-        )
-        db.session.add(novo_usuario)
-        db.session.commit()
-        
-        login_user(novo_usuario) # Auto-login após registo
-        return jsonify({"success": True}), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": "Erro interno ao gravar o utilizador."}), 500
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login_page'))
-
-# ==========================================
-# 4. ROTAS DA APLICAÇÃO (CORE)
-# ==========================================
 @app.route('/')
 @login_required
 def index():
@@ -119,7 +71,60 @@ def treinamentos_page():
     return render_template('treinamentos.html')
 
 # ==========================================
-# 5. ROTAS DE CADASTRO (API)
+# 4. SERVIÇOS DE AUTENTICAÇÃO (API)
+# ==========================================
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json() or {}
+    email = data.get('email', '').strip()
+    password = data.get('password', '')
+
+    user = Usuario.query.filter_by(email=email).first()
+    if user and check_password_hash(user.password, password):
+        login_user(user)
+        return jsonify({"success": True}), 200
+        
+    return jsonify({"error": "Credenciais inválidas"}), 401
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    data = request.get_json() or {}
+    
+    # Tolerância Arquitetural: Aceita 'nome' ou 'name' enviados pelo frontend
+    nome = (data.get('nome') or data.get('name', '')).strip()
+    email = data.get('email', '').strip()
+    password = data.get('password', '')
+
+    # Validação Fail-Fast limpa e estrita
+    if not nome or not email or not password:
+        return jsonify({"error": "Nome, e-mail e senha são obrigatórios."}), 400
+
+    if Usuario.query.filter_by(email=email).first():
+        return jsonify({"error": "E-mail já cadastrado."}), 409
+
+    try:
+        novo_usuario = Usuario(
+            nome=nome,
+            email=email,
+            password=generate_password_hash(password)
+        )
+        db.session.add(novo_usuario)
+        db.session.commit()
+        
+        login_user(novo_usuario)
+        return jsonify({"success": True}), 201
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Erro interno ao salvar no banco."}), 500
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login_page'))
+
+# ==========================================
+# 5. SERVIÇOS DE NEGÓCIO (API RECURSOS)
 # ==========================================
 @app.route('/api/setor', methods=['POST'])
 @login_required
@@ -144,15 +149,15 @@ def api_setor():
 @app.route('/api/colaborador', methods=['POST'])
 @login_required
 def api_colaborador():
-    nome = request.form.get('nome')
-    cargo = request.form.get('cargo')
+    nome = request.form.get('nome', '').strip()
+    cargo = request.form.get('cargo', '').strip()
     setor_id = request.form.get('setor_id')
 
     if not all([nome, cargo, setor_id]):
         return jsonify({"error": "Dados incompletos para colaborador."}), 400
 
     try:
-        db.session.add(Colaborador(nome=nome.strip(), cargo=cargo.strip(), setor_id=int(setor_id)))
+        db.session.add(Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id)))
         db.session.commit()
         return jsonify({"success": True}), 201
     except Exception:
