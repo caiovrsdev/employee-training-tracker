@@ -4,12 +4,12 @@
 <div class="topbar">
     <h1>Lista de Treinamentos (Lista Doc)</h1>
     {% if current_user.is_authenticated %}
-    <a href="{{ url_for('novo_treinamento') }}" class="btn btn-primary">+ Novo Treinamento</a>
+    <a href="{{ url_for('novo_treinamento') }}" class="btn btn-primary" target="_self">+ Novo Treinamento</a>
     {% endif %}
 </div>
 
 <div class="tip-box">
-    <strong>Dica:</strong> Adicionar um treinamento aqui faz com que ele apareça automaticamente em todos os setores configurados no campo "Departamentos Aplicáveis".
+    <strong>Dica:</strong> Adicionar um treinamento aqui faz com que ele apareça automaticamente em todos os setores configurados.
 </div>
 
 <div class="card-box">
@@ -17,14 +17,14 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 50px;">#</th>
+                    <th>#</th>
                     <th>Código / Nome</th>
-                    <th>Departamentos Aplicáveis</th>
-                    <th>Sigla Doc</th>
-                    <th>Data de Aprovação</th>
+                    <th>Departamentos</th>
+                    <th>Sigla</th>
+                    <th>Data Aprovação</th>
                     <th>Obs</th>
                     {% if current_user.is_authenticated %}
-                    <th style="width: 100px; text-align: center;">Ações</th>
+                    <th>Ações</th>
                     {% endif %}
                 </tr>
             </thead>
@@ -33,21 +33,19 @@
                 <tr>
                     <td>{{ loop.index }}</td>
                     <td><strong>{{ t.nome }}</strong></td>
-                    <td>{{ t.departamentos }}</td>
+                    <td>{{ t.departamentos if t.departamentos else '-' }}</td>
                     <td><span class="chip">{{ t.sigla_doc if t.sigla_doc else '-' }}</span></td>
                     <td>{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
-                    <td style="color: var(--text-dim);">{{ t.observacoes if t.observacoes else '-' }}</td>
+                    <td>{{ t.observacoes if t.observacoes else '-' }}</td>
                     {% if current_user.is_authenticated %}
-                    <td style="text-align: center;">
-                        <a href="{{ url_for('editar_treinamento', tid=t.id) }}" class="btn btn-sm" style="margin-right: 4px;">Editar</a>
+                    <td>
+                        <a href="{{ url_for('editar_treinamento', tid=t.id) }}" class="btn btn-sm">Editar</a>
                     </td>
                     {% endif %}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="{{ 7 if current_user.is_authenticated else 6 }}" style="text-align: center; color: var(--text-dim); padding: 24px;">
-                        Nenhum treinamento cadastrado. <a href="{{ url_for('novo_treinamento') }}" style="color: var(--accent);">Adicionar</a>
-                    </td>
+                    <td colspan="7" style="text-align: center;">Nenhum treinamento cadastrado.</td>
                 </tr>
                 {% endfor %}
             </tbody>
