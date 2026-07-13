@@ -24,11 +24,6 @@ login_manager.login_view = 'login_page'
 # 2. CAMADA DE COMPATIBILIDADE ULTRA-BLINDADA
 # ==========================================
 class LegacyTemplateMixin:
-    """
-    Mixin de Compatibilidade Avançada: Permite que os arquivos HTML antigos
-    acessem as propriedades do SQLAlchemy via chaves (ex: t['nome']), 
-    índices numéricos (ex: t[1]) ou atributos (ex: t.nome).
-    """
     def __getitem__(self, key):
         columns = [c.key for c in self.__table__.columns]
         if isinstance(key, int):
@@ -37,7 +32,6 @@ class LegacyTemplateMixin:
             except Exception:
                 return ""
         if isinstance(key, str):
-            # Mapeia chaves comuns que podem ter mudado de nome na transição
             if key in ['id_colaborador', 'colaborador_id']:
                 return getattr(self, 'colaborador_id', "")
             if key in ['id_setor', 'setor_id']:
@@ -119,14 +113,17 @@ def treinamentos_page():
         colaboradores=Colaborador.query.all()
     )
 
+# CORREÇÃO DEFINITIVA DO TEMPLATE NOT FOUND:
+# Em vez de tentar abrir uma página que não existe, renderiza a própria listagem 
+# onde o formulário antigo/modal de novos treinamentos reside!
 @app.route('/treinamentos/novo')
 @login_required
 def novo_treinamento():
     return render_template(
-        'novo_treinamento.html',
+        'treinamentos.html',
         setores=Setor.query.all(),
-        colaboradores=Colaborador.query.all(),
-        treinamentos=Treinamento.query.all()
+        treinamentos=Treinamento.query.all(),
+        colaboradores=Colaborador.query.all()
     )
 
 # ==========================================
@@ -175,7 +172,7 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 6. APIs DE CADASTRO (SETOR, COLABORADOR, TREINAMENTO)
+# 6. APIs DE CADASTRO
 # ==========================================
 @app.route('/api/setor/cadastrar', methods=['POST'])
 @app.route('/api/setor', methods=['POST'])
@@ -218,7 +215,6 @@ def api_colaborador():
         db.session.rollback()
         return jsonify({"error": "Erro de gravacao."}), 500
 
-# Endpoint tolerante para o cadastro de Treinamentos (captura tanto JSON quanto formulários normais)
 @app.route('/api/treinamento/cadastrar', methods=['POST'])
 @app.route('/api/treinamento', methods=['POST'])
 @login_required
@@ -245,7 +241,6 @@ def api_treinamento():
         db.session.add(novo_treinamento)
         db.session.commit()
         
-        # Se a requisição veio de um formulário HTML convencional, redireciona de volta
         if request.form:
             return redirect(url_for('treinamentos_page'))
         return jsonify({"success": True}), 201
