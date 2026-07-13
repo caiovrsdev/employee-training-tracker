@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ==========================================
 # 1. INFRAESTRUTURA E CONFIGURAÇÃO ABSOLUTA
 # ==========================================
-app = Flask(__name__)  # CORRIGIDO: __name__ com underlines estruturais
+app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -21,20 +21,33 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
 # ==========================================
-# 2. CAMADA DE COMPATIBILIDADE TRANSICIONAL
+# 2. CAMADA DE COMPATIBILIDADE ULTRA-BLINDADA
 # ==========================================
 class LegacyTemplateMixin:
+    """
+    Mixin de Compatibilidade Avançada: Permite que os arquivos HTML antigos
+    acessem as propriedades do SQLAlchemy via chaves (ex: t['nome']), 
+    índices numéricos (ex: t[1]) ou atributos (ex: t.nome).
+    """
     def __getitem__(self, key):
+        columns = [c.key for c in self.__table__.columns]
         if isinstance(key, int):
             try:
-                columns = [c.key for c in self.__table__.columns]
                 return getattr(self, columns[key], "")
             except Exception:
                 return ""
-        return getattr(self, key, "")
+        if isinstance(key, str):
+            # Mapeia chaves comuns que podem ter mudado de nome na transição
+            if key in ['id_colaborador', 'colaborador_id']:
+                return getattr(self, 'colaborador_id', "")
+            if key in ['id_setor', 'setor_id']:
+                return getattr(self, 'setor_id', "")
+            return getattr(self, key, "")
+        return ""
 
     def get(self, key, default=None):
-        return getattr(self, key, default)
+        val = self.__getitem__(key)
+        return val if val != "" else default
 
 # ==========================================
 # 3. MODELOS DE PERSISTÊNCIA
@@ -162,20 +175,18 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 6. APIs DE CADASTRO
+# 6. APIs DE CADASTRO (SETOR, COLABORADOR, TREINAMENTO)
 # ==========================================
 @app.route('/api/setor/cadastrar', methods=['POST'])
 @app.route('/api/setor', methods=['POST'])
 @login_required
 def api_setor():
     data = request.get_json(silent=True) or request.form or {}
-    
     sigla = (data.get('sigla') or data.get('txt_sigla') or data.get('txtSigla') or data.get('sigla_setor') or '').strip().upper()
     nome = (data.get('nome') or data.get('txt_nome') or data.get('txtNome') or data.get('nome_setor') or data.get('name') or '').strip()
     
     if not sigla or not nome:
         return jsonify({"error": "Campos obrigatorios nao identificados."}), 400
-        
     if Setor.query.filter_by(sigla=sigla).first():
         return jsonify({"error": "O setor ja existe."}), 409
 
@@ -192,26 +203,56 @@ def api_setor():
 @login_required
 def api_colaborador():
     data = request.get_json(silent=True) or request.form or {}
-    
-    # Logger preventivo para inspecionar no Render exatamente o que o frontend está cuspindo
-    print(f"--- LOG DE ENTRADA COLABORADOR --- Payload recebido: {dict(data)}", file=sys.stderr)
-    
     nome = (data.get('nome') or data.get('txt_nome') or data.get('txtColaborador') or data.get('name') or '').strip()
     cargo = (data.get('cargo') or data.get('txt_cargo') or data.get('txtCargo') or data.get('funcao') or '').strip()
     setor_id = data.get('setor_id') or data.get('txt_setor_id') or data.get('setor') or data.get('sel_setor')
 
     if not all([nome, cargo, setor_id]):
-        print(f"--- ERRO VALIDACAO COLABORADOR --- Nome: {bool(nome)}, Cargo: {bool(cargo)}, Setor ID: {bool(setor_id)}", file=sys.stderr)
         return jsonify({"error": "Dados de colaborador incompletos."}), 400
 
     try:
         db.session.add(Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id)))
         db.session.commit()
         return jsonify({"success": True}), 201
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Erro de gravacao."}), 500
+
+# Endpoint tolerante para o cadastro de Treinamentos (captura tanto JSON quanto formulários normais)
+@app.route('/api/treinamento/cadastrar', methods=['POST'])
+@app.route('/api/treinamento', methods=['POST'])
+@login_required
+def api_treinamento():
+    data = request.get_json(silent=True) or request.form or {}
+    
+    nome = (data.get('nome') or data.get('txt_nome') or data.get('txtTreinamento') or data.get('nome_treinamento') or '').strip()
+    data_realizacao = data.get('data_realizacao') or data.get('txt_data') or data.get('data') or data.get('txtDataRealizacao')
+    validade = data.get('validade') or data.get('txt_validade') or data.get('validade_treinamento') or data.get('txtValidade')
+    status = data.get('status') or data.get('txt_status') or data.get('status_treinamento') or 'Pendente'
+    colaborador_id = data.get('colaborador_id') or data.get('txt_colaborador_id') or data.get('colaborador') or data.get('sel_colaborador')
+
+    if not nome or not colaborador_id:
+        return jsonify({"error": "Nome do treinamento e colaborador sao obrigatorios."}), 400
+
+    try:
+        novo_treinamento = Treinamento(
+            nome=nome,
+            data_realizacao=str(data_realizacao) if data_realizacao else "",
+            validade=str(validade) if validade else "",
+            status=str(status),
+            colaborador_id=int(colaborador_id)
+        )
+        db.session.add(novo_treinamento)
+        db.session.commit()
+        
+        # Se a requisição veio de um formulário HTML convencional, redireciona de volta
+        if request.form:
+            return redirect(url_for('treinamentos_page'))
+        return jsonify({"success": True}), 201
     except Exception as err:
         db.session.rollback()
-        print(f"--- ERRO DB COLABORADOR --- Detalhes: {str(err)}", file=sys.stderr)
-        return jsonify({"error": "Erro de gravacao."}), 500
+        print(f"--- ERRO CADASTRO TREINAMENTO --- Detalhes: {str(err)}", file=sys.stderr)
+        return jsonify({"error": "Erro ao salvar treinamento no banco."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
