@@ -12,7 +12,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
-# Isolamento total: ignora o ecossistema do Render e força um arquivo limpo na raiz
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v3_clean.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -25,10 +24,6 @@ login_manager.login_view = 'login_page'
 # 2. CAMADA DE COMPATIBILIDADE TRANSICIONAL
 # ==========================================
 class LegacyTemplateMixin:
-    """
-    Mixin de Proteção: Garante integridade se o Jinja2 tentar acessar os
-    novos objetos como se fossem tuplas (índices) ou dicionários do SQLite antigo.
-    """
     def __getitem__(self, key):
         if isinstance(key, int):
             try:
@@ -111,6 +106,12 @@ def treinamentos_page():
         colaboradores=Colaborador.query.all()
     )
 
+# Correção do BuildError: Criação do endpoint exigido pelo template 'treinamentos.html'
+@app.route('/treinamentos/novo')
+@login_required
+def novo_treinamento():
+    return render_template('novo_treinamento.html')
+
 # ==========================================
 # 5. ENDPOINTS DE AUTENTICAÇÃO
 # ==========================================
@@ -157,14 +158,16 @@ def logout():
     return redirect(url_for('login_page'))
 
 # ==========================================
-# 6. APIs DE CADASTRO (VARREDURA TOLERANTE)
+# 6. APIs DE CADASTRO
 # ==========================================
+
+# Correção do Erro 404: Mapeado exatamente para a rota acionada pelo seu frontend JS
+@app.route('/api/setor/cadastrar', methods=['POST'])
 @app.route('/api/setor', methods=['POST'])
 @login_required
 def api_setor():
     data = request.get_json(silent=True) or request.form or {}
     
-    # Varredura dinâmica de chaves para aceitar qualquer nome estruturado no HTML antigo
     sigla = (data.get('sigla') or data.get('txt_sigla') or data.get('txtSigla') or data.get('sigla_setor') or '').strip().upper()
     nome = (data.get('nome') or data.get('txt_nome') or data.get('txtNome') or data.get('nome_setor') or data.get('name') or '').strip()
     
