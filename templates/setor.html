@@ -1,64 +1,92 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-    <h2>Matriz: {{ setor.sigla }} - {{ setor.nome }}</h2>
-    <div style="display: flex; gap: 8px;">
-        <a href="/setor/{{ setor.id }}/exportar" class="btn">Excel</a>
-        <a href="/" class="btn">Voltar</a>
+<div class="topbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <div>
+        <h1 style="margin: 0; font-size: 24px; color: var(--primary);">Setor: {{ setor.sigla }} - {{ setor.nome }}</h1>
+        <p style="margin: 5px 0 0 0; color: var(--text-dim);">Controle interno de treinamentos da Ecolyzer</p>
+    </div>
+    <a href="/" class="btn">Voltar para Dashboard</a>
+</div>
+
+<div class="card-box" style="background: #ffffff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.01);">
+    <div class="table-wrap" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
+                    <th style="padding: 12px 8px;">Nome do Treinamento</th>
+                    <th style="padding: 12px 8px;">Nome do Colaborador / Realizacao / Status</th>
+                    <th style="padding: 12px 8px; width: 120px; text-align: center;">Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr style="border-bottom: 1px solid var(--border); transition: background-color 0.2s;">
+                    <td style="padding: 14px 8px;">
+                        <strong>{{ r.treinamento.nome }}</strong>
+                    </td>
+                    <td style="padding: 14px 8px;">
+                        <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">{{ r.colaborador.nome }}</div>
+                        <div style="font-size: 12px; color: var(--text-dim);">
+                            Realizado em: {{ r.treinamento.data_realizacao if r.treinamento.data_realizacao else 'Nao realizada' }}
+                            <span style="margin-left: 8px;"></span>
+                            {% if r.status == 'Valido' %}
+                            <span class="chip-valido">Valido</span>
+                            {% else %}
+                            <span class="chip-pendente">Pendente</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="padding: 14px 8px; text-align: center;">
+                        <button onclick="abrirModalAtualizacao('{{ r.treinamento.id }}', '{{ r.colaborador.nome }}', '{{ r.treinamento.nome }}', '{{ r.treinamento.data_realizacao if r.treinamento.data_realizacao else \'\' }}')" class="btn-sm">Atualizar</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                        Nenhum colaborador ou treinamento associado a este setor no momento.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 
-<div class="card-box" style="padding: 0; overflow-x: auto;">
-    <table>
-        <thead>
-            <tr>
-                <th style="min-width: 250px;">Treinamento</th>
-                {% for c in colaboradores_setor %}
-                <th style="text-align: center; min-width: 140px; border-left: 1px solid var(--border);">
-                    <a href="/colaborador/{{ c.id }}" style="color: var(--primary); text-decoration: none; font-size: 14px;">{{ c.nome }}</a>
-                </th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in treinamentos_setor %}
-            <tr>
-                <td>
-                    <div style="font-weight: 600;">{{ t.nome }}</div>
-                    <div style="font-size: 11px; color: var(--text-dim);">Aprovação: {{ t.data_aprovacao or '--' }}</div>
-                </td>
-                
-                {% for colab in colaboradores_setor %}
-                    {% set ns = namespace(data=none, status='vazio', is_na=0) %}
-                    {% for r in matriz_dados %}
-                        {% if r.colaborador_id == colab.id and r.treinamento_id == t.id %}
-                            {% set ns.is_na = r.na %}
-                            {% if r.na == 1 %}{% set ns.status = 'na' %}
-                            {% else %}
-                                {% set ns.data = r.data_realizacao %}
-                                {% set ns.status = status_treinamento(t.data_aprovacao, r.data_realizacao, r.na) %}
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
+<div id="modalAtualizar" class="modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div style="background-color: #ffffff; margin: 10% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <h3 style="margin-top: 0; color: var(--primary); font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;">Atualizar Registro de Treinamento</h3>
+        
+        <p style="font-size: 14px; margin-bottom: 15px; color: var(--text-main);">
+            Colaborador: <strong id="modalColabNome"></strong><br>
+            Treinamento: <strong id="modalTreinamentoNome"></strong>
+        </p>
 
-                    <td class="matrix-cell" style="text-align: center; border-left: 1px solid var(--border); cursor: pointer;"
-                        data-colab-id="{{ colab.id }}" data-treino-id="{{ t.id }}"
-                        data-current-date="{{ ns.data or '' }}" data-current-na="{{ ns.is_na }}">
-                        
-                        {% if ns.status == 'válido' %}
-                            <div class="status-badge valido">Válido</div><div style="font-size: 11px; color: var(--text-dim);">{{ ns.data }}</div>
-                        {% elif ns.status == 'pendente' %}
-                            <div class="status-badge pendente">Pendente</div><div style="font-size: 11px; color: var(--red);">{{ ns.data }}</div>
-                        {% elif ns.status == 'na' %}
-                            <div class="status-badge" style="background: var(--border); color: var(--text-dim);">NA</div>
-                        {% else %}
-                            <div class="status-badge vazio">Não Feito</div>
-                        {% endif %}
-                    </td>
-                {% endfor %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <form id="formAtualizar" method="POST" style="display: flex; flex-direction: column; gap: 15px;">
+            <div>
+                <label for="modalDataRealizacao">Data de Realizacao</label>
+                <input type="date" id="modalDataRealizacao" name="data_realizacao" required>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                <button type="button" onclick="fecharModalAtualizacao()" class="btn-sm">Cancelar</button>
+                <button type="submit" class="btn">Confirmar</button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<script>
+    function abrirModalAtualizacao(tid, colabNome, treinamentoNome, dataReal) {
+        document.getElementById('modalColabNome').textContent = colabNome;
+        document.getElementById('modalTreinamentoNome').textContent = treinamentoNome;
+        document.getElementById('modalDataRealizacao').value = dataReal;
+        document.getElementById('formAtualizar').action = '/api/treinamento/atualizar/' + tid;
+        document.getElementById('modalAtualizar').style.display = 'block';
+    }
+
+    function fecharModalAtualizacao() {
+        document.getElementById('modalAtualizar').style.display = 'none';
+    }
+</script>
 {% endblock %}
