@@ -1,15 +1,12 @@
 import os
-import sys
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# ==========================================
-# 1. CONFIGURAÇÃO E INFRAESTRUTURA
-# ==========================================
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
+app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta_ecolyzer')
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v3_clean.db')}"
@@ -20,7 +17,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
 # ==========================================
-# 2. MODELOS DE BANCO DE DADOS (Ordem Correta)
+# MODELOS DE BANCO DE DADOS
 # ==========================================
 class Usuario(db.Model, UserMixin):
     __tablename__ = 'usuarios'
@@ -50,7 +47,8 @@ class Treinamento(db.Model):
     nome = db.Column(db.String(200), nullable=False)
     departamentos = db.Column(db.String(200), nullable=True)
     sigla_doc = db.Column(db.String(20), nullable=True)
-    data_aprovacao = db.Column(db.String(20), nullable=True)
+    data_aprovacao = db.Column(db.String(20), nullable=True)  # POP data aprovacao
+    data_realizacao = db.Column(db.String(20), nullable=True) # Dia do treinamento realizado
     observacoes = db.Column(db.Text, nullable=True)
     colaborador_id = db.Column(db.Integer, db.ForeignKey('colaboradores.id'), nullable=True)
 
@@ -58,11 +56,34 @@ class Treinamento(db.Model):
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
+# Criação segura de tabelas
 with app.app_context():
     db.create_all()
 
 # ==========================================
-# 3. ROTAS DE VISUALIZAÇÃO (TEMPLATES)
+# FUNÇÕES AUXILIARES DE COMPARAÇÃO DE STATUS
+# ==========================================
+def calcular_status_treinamento(data_realizacao, data_aprovacao):
+    if not data_realizacao or not data_aprovacao:
+        return "Pendente"
+    try:
+        d_real = datetime.strptime(data_realizacao, "%Y-%m-%d")
+        d_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d")
+        if d_real > d_aprov:
+            return "Valido"
+        else:
+            return "Pendente"
+    except Exception:
+        if data_realizacao > data_aprovacao:
+            return "Valido"
+        return "Pendente"
+
+@app.context_processor
+def utility_processor():
+    return dict(get_status=calcular_status_treinamento)
+
+# ==========================================
+# ROTAS DE VISUALIZAÇÃO
 # ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -83,15 +104,37 @@ def colaboradores_page():
 @app.route('/treinamentos')
 @login_required
 def treinamentos_page():
-    return render_template('treinamentos.html', treinamentos=Treinamento.query.all())
+    filtro_pendente = request.args.get('filtro') == 'pendente'
+    all_treinamentos = Treinamento.query.all()
+    
+    if filtro_pendente:
+        treinamentos_filtrados = []
+        for t in all_treinamentos:
+            if calcular_status_treinamento(t.data_realizacao, t.data_aprovacao) == "Pendente":
+                treinamentos_filtrados.append(t)
+    else:
+        treinamentos_filtrados = all_treinamentos
+        
+    return render_template('treinamentos.html', treinamentos=treinamentos_filtrados)
 
-@app.route('/treinamentos/editar/<int:tid>')
+@app.route('/setor/<int:sid>')
 @login_required
-def editar_treinamento(tid):
-    return redirect(url_for('treinamentos_page'))
+def view_setor(sid):
+    setor = Setor.query.get_or_404(sid)
+    colaboradores = Colaborador.query.filter_by(setor_id=sid).all()
+    records = []
+    for colab in colaboradores:
+        for t in colab.treinamentos:
+            status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
+            records.append({
+                "colaborador": colab,
+                "treinamento": t,
+                "status": status
+            })
+    return render_template('setor.html', setor=setor, records=records)
 
 # ==========================================
-# 4. ENDPOINTS DE API (Autenticação, Cadastros e Filtros)
+# ENDPOINTS DE API E PROCESSAMENTOS
 # ==========================================
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -102,7 +145,7 @@ def api_login():
     if user and check_password_hash(user.password, password):
         login_user(user)
         return jsonify({"success": True}), 200
-    return jsonify({"error": "Credenciais inválidas."}), 401
+    return jsonify({"error": "Credenciais invalidas"}), 401
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
@@ -111,7 +154,7 @@ def api_register():
     email = data.get('email', '').strip()
     password = data.get('password', '')
     if Usuario.query.filter_by(email=email).first():
-        return jsonify({"error": "E-mail já cadastrado."}), 409
+        return jsonify({"error": "E-mail ja cadastrado"}), 409
     
     novo_usuario = Usuario(nome=nome, email=email, password=generate_password_hash(password))
     db.session.add(novo_usuario)
@@ -152,34 +195,78 @@ def api_treinamento():
         departamentos=request.form.get('departamentos', ''),
         sigla_doc=request.form.get('sigla_doc', ''),
         data_aprovacao=request.form.get('data_aprovacao', ''),
-        observacoes=request.form.get('observacoes', '')
+        data_realizacao=request.form.get('data_realizacao', ''),
+        observacoes=request.form.get('observacoes', ''),
+        colaborador_id=request.form.get('colaborador_id')
     )
     db.session.add(novo_treinamento)
     db.session.commit()
     return redirect(url_for('treinamentos_page'))
 
+@app.route('/api/treinamento/atualizar/<int:tid>', methods=['POST'])
+@login_required
+def api_atualizar_treinamento(tid):
+    t = Treinamento.query.get_or_404(tid)
+    data_real = request.form.get('data_realizacao')
+    if data_real:
+        t.data_realizacao = data_real
+        db.session.commit()
+    return redirect(request.referrer or url_for('index'))
+
+@app.route('/api/cargos', methods=['GET'])
+@login_required
+def api_cargos():
+    cargos = db.session.query(Colaborador.cargo).distinct().all()
+    return jsonify([c[0] for c in cargos if c[0]])
+
+@app.route('/api/funil', methods=['POST'])
+@login_required
+def api_funil():
+    data = request.get_json() or {}
+    setor_id = data.get('setor_id')
+    cargo = data.get('cargo')
+
+    query = Colaborador.query
+    if setor_id:
+        query = query.filter_by(setor_id=int(setor_id))
+    if cargo:
+        query = query.filter_by(cargo=cargo)
+
+    colaboradores = query.all()
+    resultados = []
+
+    for colab in colaboradores:
+        for t in colab.treinamentos:
+            status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
+            resultados.append({
+                "colaborador_nome": colab.nome,
+                "cargo": colab.cargo,
+                "setor_sigla": colab.setor_ref.sigla if colab.setor_ref else "",
+                "treinamento_nome": t.nome,
+                "data_realizacao": t.data_realizacao or "Nao realizada",
+                "status": "Valido" if status == "Valido" else "Pendente"
+            })
+
+    return jsonify({"success": True, "resultados": resultados})
+
 @app.route('/api/dashboard/stats', methods=['GET'])
 @login_required
 def api_dashboard_stats():
-    setor_id = request.args.get('setor')
-    
-    if setor_id:
-        colaboradores_query = Colaborador.query.filter_by(setor_id=int(setor_id))
-        total_colab = colaboradores_query.count()
-        colab_ids = [c.id for c in colaboradores_query.all()]
-        total_treinamentos = Treinamento.query.filter(Treinamento.colaborador_id.in_(colab_ids)).count() if colab_ids else 0
-    else:
-        total_colab = Colaborador.query.count()
-        total_treinamentos = Treinamento.query.count()
-
+    total_treinamentos = Treinamento.query.count()
     total_setores = Setor.query.count()
     
+    treinamentos_all = Treinamento.query.all()
+    treinamentos_pendentes = 0
+    for t in treinamentos_all:
+        status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
+        if status == "Pendente":
+            treinamentos_pendentes += 1
+
     return jsonify({
         "success": True,
-        "total_colaboradores": total_colab,
         "total_treinamentos": total_treinamentos,
-        "total_setores": total_setores,
-        "taxa_conclusao": 85 
+        "treinamentos_pendentes": treinamentos_pendentes,
+        "total_setores": total_setores
     }), 200
 
 if __name__ == '__main__':
