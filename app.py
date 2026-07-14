@@ -5,13 +5,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# ==========================================
-# 1. INFRAESTRUTURA
-# ==========================================
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
-# Configuração do Banco
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v3_clean.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -21,9 +17,8 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
 # ==========================================
-# 2. MODELOS (Definidos na ordem correta de dependência)
+# MODELOS DE BANCO DE DADOS
 # ==========================================
-
 class Usuario(db.Model, UserMixin):
     __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
@@ -36,7 +31,6 @@ class Setor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sigla = db.Column(db.String(10), unique=True, nullable=False)
     nome = db.Column(db.String(100), nullable=False)
-    # Relação: Um setor tem vários colaboradores
     colaboradores = db.relationship('Colaborador', backref='setor_ref', lazy=True)
 
 class Colaborador(db.Model):
@@ -45,7 +39,6 @@ class Colaborador(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     cargo = db.Column(db.String(50), nullable=False)
     setor_id = db.Column(db.Integer, db.ForeignKey('setores.id'), nullable=False)
-    # Relação: Um colaborador tem vários treinamentos
     treinamentos = db.relationship('Treinamento', backref='colaborador_ref', lazy=True)
 
 class Treinamento(db.Model):
@@ -62,14 +55,12 @@ class Treinamento(db.Model):
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-# Cria o banco com as tabelas na ordem correta
 with app.app_context():
     db.create_all()
 
 # ==========================================
-# 3. ROTAS E LÓGICA (O mesmo comportamento anterior)
+# ROTAS DE PÁGINAS VISUAIS
 # ==========================================
-
 @app.route('/login', methods=['GET'])
 def login_page():
     if current_user.is_authenticated:
@@ -81,28 +72,24 @@ def login_page():
 def index():
     return render_template('index.html', setores=Setor.query.all())
 
-@app.route('/treinamentos')
-@login_required
-def treinamentos_page():
-    return render_template('treinamentos.html', treinamentos=Treinamento.query.all())
-
 @app.route('/colaboradores')
 @login_required
 def colaboradores_page():
     return render_template('colaboradores.html', setores=Setor.query.all(), colaboradores=Colaborador.query.all())
 
-@app.route('/treinamentos/novo')
+@app.route('/treinamentos')
 @login_required
-def novo_treinamento():
+def treinamentos_page():
     return render_template('treinamentos.html', treinamentos=Treinamento.query.all())
 
 @app.route('/treinamentos/editar/<int:tid>')
 @login_required
 def editar_treinamento(tid):
-    treinamento = Treinamento.query.get_or_404(tid)
-    return render_template('treinamentos.html', treinamentos=Treinamento.query.all())
+    return redirect(url_for('treinamentos_page'))
 
-# APIs de Autenticação
+# ==========================================
+# ENDPOINTS DE AUTENTICAÇÃO E CADASTROS
+# ==========================================
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json(silent=True) or request.form or {}
@@ -134,14 +121,11 @@ def logout():
     logout_user()
     return redirect(url_for('login_page'))
 
-# APIs de Cadastro
 @app.route('/api/setor/cadastrar', methods=['POST'])
 @login_required
 def api_setor():
     data = request.get_json(silent=True) or request.form or {}
-    sigla = (data.get('sigla') or '').strip().upper()
-    nome = (data.get('nome') or '').strip()
-    db.session.add(Setor(sigla=sigla, nome=nome))
+    db.session.add(Setor(sigla=(data.get('sigla') or '').strip().upper(), nome=(data.get('nome') or '').strip()))
     db.session.commit()
     return jsonify({"success": True}), 201
 
@@ -149,13 +133,28 @@ def api_setor():
 @login_required
 def api_colaborador():
     data = request.get_json(silent=True) or request.form or {}
-    db.session.add(Colaborador(
-        nome=data.get('nome'), 
-        cargo=data.get('cargo'), 
-        setor_id=int(data.get('setor_id'))
-    ))
+    db.session.add(Colaborador(nome=data.get('nome'), cargo=data.get('cargo'), setor_id=int(data.get('setor_id'))))
     db.session.commit()
     return jsonify({"success": True}), 201
 
+# ---> A ROTA QUE VAI SALVAR O SEU NOVO TREINAMENTO <---
+@app.route('/api/treinamento/cadastrar', methods=['POST'])
+@login_required
+def api_treinamento():
+    nome = request.form.get('nome')
+    if not nome:
+        return redirect(url_for('treinamentos_page'))
+    
+    novo_treinamento = Treinamento(
+        nome=nome,
+        departamentos=request.form.get('departamentos', ''),
+        sigla_doc=request.form.get('sigla_doc', ''),
+        data_aprovacao=request.form.get('data_aprovacao', ''),
+        observacoes=request.form.get('observacoes', '')
+    )
+    db.session.add(novo_treinamento)
+    db.session.commit()
+    return redirect(url_for('treinamentos_page'))
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
