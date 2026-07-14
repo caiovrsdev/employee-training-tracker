@@ -1,52 +1,52 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="topbar">
-    <h1>Lista de Treinamentos (Lista Doc)</h1>
+<div class="topbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h1 style="margin: 0; font-size: 24px; color: var(--primary);">Lista de Treinamentos (Lista Doc)</h1>
     {% if current_user.is_authenticated %}
-    <button onclick="abrirModal()" class="btn btn-primary" style="cursor: pointer;">+ Novo Treinamento</button>
+    <button onclick="abrirModal()" class="btn" style="cursor: pointer;">+ Novo Treinamento</button>
     {% endif %}
 </div>
 
-<div class="tip-box">
+<div class="tip-box" style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; border-radius: 6px; margin-bottom: 30px; font-size: 14px; color: #15803d;">
     <strong>Dica:</strong> Adicionar um treinamento aqui faz com que ele apareça automaticamente em todos os setores configurados no campo "Departamentos Aplicáveis".
 </div>
 
-<div class="card-box">
-    <div class="table-wrap">
-        <table>
+<div class="card-box" style="background: #ffffff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.01);">
+    <div class="table-wrap" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
-                <tr>
-                    <th style="width: 50px;">#</th>
-                    <th>Código / Nome</th>
-                    <th>Departamentos Aplicáveis</th>
-                    <th>Sigla Doc</th>
-                    <th>Data de Aprovação</th>
-                    <th>Obs</th>
+                <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
+                    <th style="padding: 12px 8px; width: 50px;">#</th>
+                    <th style="padding: 12px 8px;">Código / Nome</th>
+                    <th style="padding: 12px 8px;">Departamentos Aplicáveis</th>
+                    <th style="padding: 12px 8px;">Sigla Doc</th>
+                    <th style="padding: 12px 8px;">Data de Aprovação</th>
+                    <th style="padding: 12px 8px;">Obs</th>
                     {% if current_user.is_authenticated %}
-                    <th style="width: 100px; text-align: center;">Ações</th>
+                    <th style="padding: 12px 8px; width: 100px; text-align: center;">Ações</th>
                     {% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for t in treinamentos %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td><strong>{{ t.nome }}</strong></td>
-                    <td>{{ t.departamentos if t.departamentos else '-' }}</td>
-                    <td><span class="chip">{{ t.sigla_doc if t.sigla_doc else '-' }}</span></td>
-                    <td>{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
-                    <td style="color: var(--text-dim);">{{ t.observacoes if t.observacoes else '-' }}</td>
+                <tr style="border-bottom: 1px solid var(--border); transition: background-color 0.2s;">
+                    <td style="padding: 14px 8px;">{{ loop.index }}</td>
+                    <td style="padding: 14px 8px;"><strong>{{ t.nome }}</strong></td>
+                    <td style="padding: 14px 8px;">{{ t.departamentos if t.departamentos else '-' }}</td>
+                    <td style="padding: 14px 8px;"><span class="chip">{{ t.sigla_doc if t.sigla_doc else '-' }}</span></td>
+                    <td style="padding: 14px 8px;">{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
+                    <td style="padding: 14px 8px; color: var(--text-dim);">{{ t.observacoes if t.observacoes else '-' }}</td>
                     {% if current_user.is_authenticated %}
-                    <td style="text-align: center;">
-                        <a href="{{ url_for('editar_treinamento', tid=t.id) }}" class="btn btn-sm" style="margin-right: 4px;">Editar</a>
+                    <td style="padding: 14px 8px; text-align: center;">
+                        <a href="{{ url_for('editar_treinamento', tid=t.id) }}" class="btn btn-sm">Editar</a>
                     </td>
                     {% endif %}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="{{ 7 if current_user.is_authenticated else 6 }}" style="text-align: center; color: var(--text-dim); padding: 24px;">
-                        Nenhum treinamento cadastrado. <a href="#" onclick="abrirModal()" style="color: var(--accent); cursor: pointer;">Adicionar</a>
+                    <td colspan="{{ 7 if current_user.is_authenticated else 6 }}" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                        Nenhum treinamento cadastrado. <a href="#" onclick="abrirModal()" style="color: var(--accent); font-weight: 500;">Adicionar agora</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -55,48 +55,46 @@
     </div>
 </div>
 
-<div id="modalTreinamento" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
-    <div style="background-color:#ffffff; margin: 5% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative;">
-        <h2 style="margin-top: 0; color: #333; font-family: sans-serif; font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">Cadastrar Novo Treinamento</h2>
+<div id="modalTreinamento" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div style="background-color:#ffffff; margin: 6% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <h2 style="margin-top: 0; color: var(--primary); font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;">Cadastrar Novo Treinamento</h2>
         
         <form action="{{ url_for('api_treinamento') }}" method="POST" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-            
             <div>
-                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555; font-size: 14px;">Nome do Treinamento *</label>
-                <input type="text" name="nome" required placeholder="Ex: NR-10 Segurança Integrada" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px;">Nome do Treinamento *</label>
+                <input type="text" name="nome" required placeholder="NR-35 Trabalho em Altura" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box;">
             </div>
 
             <div>
-                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555; font-size: 14px;">Departamentos Aplicáveis</label>
-                <input type="text" name="departamentos" placeholder="Ex: RH, TI, Manutenção" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px;">Departamentos Aplicáveis</label>
+                <input type="text" name="departamentos" placeholder="Ex: Operações, Logística" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box;">
             </div>
 
             <div style="display: flex; gap: 15px;">
                 <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555; font-size: 14px;">Sigla Doc</label>
-                    <input type="text" name="sigla_doc" placeholder="Ex: POP-001" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px;">Sigla Doc</label>
+                    <input type="text" name="sigla_doc" placeholder="POP-NR35" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555; font-size: 14px;">Data de Aprovação</label>
-                    <input type="date" name="data_aprovacao" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px;">Data Aprovação</label>
+                    <input type="date" name="data_aprovacao" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                 </div>
             </div>
 
             <div>
-                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #555; font-size: 14px;">Observações</label>
-                <textarea name="observacoes" rows="3" placeholder="Informações adicionais..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; resize: none;"></textarea>
+                <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px;">Observações</label>
+                <textarea name="observacoes" rows="3" placeholder="Insira considerações de auditoria ou vencimento..." style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; resize: none; font-family: inherit;"></textarea>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-                <button type="button" onclick="fecharModal()" class="btn" style="background: #f1f3f5; color: #333; padding: 10px 20px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="background: #0066cc; color: #fff; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Salvar Treinamento</button>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                <button type="button" onclick="fecharModal()" style="background: #f1f5f9; color: var(--text-main); padding: 10px 18px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px;">Cancelar</button>
+                <button type="submit" class="btn">Salvar Treinamento</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    // Funções nativas que garantem a abertura do modal
     function abrirModal() {
         document.getElementById('modalTreinamento').style.display = 'block';
     }
