@@ -1,194 +1,191 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Ecolyzer - Treinamentos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecolyzer - Controle de Treinamentos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
         :root {
-            /* LIGHT MODE (Padrão ERP / myLIMS - Cores neutras, densas) */
-            --bg-body: #f1f5f9;
-            --surface: #ffffff;
-            --text: #1e293b;
-            --text-dim: #475569;
-            --border: #cbd5e1;
-            --primary: #0284c7; /* Azul corporativo mais sóbrio */
-            --primary-hover: #0369a1;
-            --green: #16a34a;
-            --red: #dc2626;
-            --nav-bg: #ffffff;
-            --radius: 4px; /* CHEGA DE REDONDINHO */
+            --primary: #004b93;
+            --accent: #0066cc;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-dim: #64748b;
+            --border: #e2e8f0;
         }
 
-        body.dark-mode {
-            /* DARK MODE (Profissional, sério e de alto contraste) */
-            --bg-body: #0f172a;
-            --surface: #1e293b;
-            --text: #f8fafc;
-            --text-dim: #94a3b8;
-            --border: #334155;
-            --primary: #38bdf8;
-            --primary-hover: #0ea5e9;
-            --green: #22c55e;
-            --red: #ef4444;
-            --nav-bg: #1e293b;
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
         }
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--bg-body); 
-            color: var(--text); 
-            margin: 0; 
-            padding: 0; 
-            transition: background-color 0.3s, color 0.3s; 
-            min-height: 100vh;
-            font-size: 13px; /* Fonte levemente menor para caber mais dados (ERP style) */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        /* NAVEGAÇÃO CORPORATIVA */
-        .nav { 
-            background-color: var(--nav-bg); 
-            padding: 12px 24px; 
-            border-bottom: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        .logo-area {
+            font-weight: 700;
+            font-size: 22px;
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .nav-left { display: flex; align-items: center; gap: 24px; }
-        .nav-right { display: flex; align-items: center; gap: 24px; }
-
-        .logo { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; }
-
-        /* MENU SUSPENSO (Atividades) */
-        .dropdown { position: relative; display: inline-block; }
-        .dropbtn { 
-            background: transparent; border: none; color: var(--text); font-family: inherit;
-            font-weight: 600; font-size: 13px; cursor: pointer; padding: 6px 0; display: flex; align-items: center; gap: 4px;
+        nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
         }
-        .dropbtn:hover { color: var(--primary); }
-        .dropdown-content { 
-            display: none; position: absolute; background-color: var(--surface); min-width: 180px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border: 1px solid var(--border); border-radius: var(--radius); z-index: 101; top: 100%;
-        }
-        .dropdown-content a { color: var(--text); padding: 10px 16px; text-decoration: none; display: block; font-size: 13px; }
-        .dropdown-content a:hover { background-color: rgba(0,0,0,0.05); color: var(--primary); }
-        body.dark-mode .dropdown-content a:hover { background-color: rgba(255,255,255,0.05); }
-        .dropdown:hover .dropdown-content { display: block; }
 
-        .nav a { color: var(--text); text-decoration: none; font-weight: 500; font-size: 13px; }
-        .nav a:hover { color: var(--primary); }
+        nav a {
+            text-decoration: none;
+            color: var(--text-dim);
+            font-weight: 500;
+            font-size: 15px;
+            transition: color 0.2s ease;
+        }
+
+        nav a:hover, nav a.active {
+            color: var(--primary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 16px;
+            width: 260px;
+        }
+
+        .search-container span {
+            color: var(--text-dim);
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
+        .search-container input {
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 100%;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            border: none;
+            transition: background-color 0.2s ease;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: var(--accent);
+        }
         
-        .container { padding: 24px; max-width: 1400px; margin: 0 auto; }
-        
-        /* CAIXAS DE DICAS / INFO (Cruciais) */
-        .info-box {
-            background-color: rgba(2, 132, 199, 0.1);
-            border-left: 4px solid var(--primary);
-            padding: 12px 16px;
-            border-radius: 0 var(--radius) var(--radius) 0;
-            margin-bottom: 24px;
-            color: var(--text);
-            line-height: 1.5;
-        }
-        .info-box strong { color: var(--primary); }
-        
-        .card-box { 
-            background-color: var(--surface); 
-            border: 1px solid var(--border); 
-            border-radius: var(--radius); 
-            padding: 20px; 
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+            background-color: #f1f5f9;
+            color: var(--text-main);
+            border: 1px solid var(--border);
         }
         
-        /* BOTÕES E INPUTS QUADRADOS/DENSOS */
-        .btn { padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-weight: 500; font-size: 13px; transition: 0.2s;}
-        .btn:hover { background-color: rgba(0,0,0,0.05); }
-        body.dark-mode .btn:hover { background-color: rgba(255,255,255,0.05); }
-        .btn-primary { background-color: var(--primary); color: #fff; border-color: var(--primary); }
-        .btn-primary:hover { background-color: var(--primary-hover); }
-        
-        .form-control { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background-color: var(--surface); color: var(--text); margin-bottom: 12px; box-sizing: border-box; font-family: inherit; font-size: 13px;}
-        .form-control:focus { outline: none; border-color: var(--primary); }
-        
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
-        th { font-weight: 600; background-color: rgba(0,0,0,0.02); color: var(--text-dim); }
-        body.dark-mode th { background-color: rgba(255,255,255,0.02); }
+        .btn-sm:hover {
+            background-color: #e2e8f0;
+        }
 
-        /* O SWITCH MODERNO E CORPORATIVO */
-        .theme-switch-wrapper { display: flex; align-items: center; }
-        .theme-switch { position: relative; display: inline-block; width: 36px; height: 20px; margin: 0; }
-        .theme-switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 20px; }
-        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);}
-        input:checked + .slider { background-color: var(--primary); }
-        input:checked + .slider:before { transform: translateX(16px); }
-        body.dark-mode .slider { background-color: #475569; }
-        body.dark-mode input:checked + .slider { background-color: var(--primary); }
+        .chip {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
     </style>
 </head>
-<body class="dark-mode">
-    <div class="nav">
-        <div class="nav-left">
-            <div class="logo">Ecol<span style="color: var(--primary);">yzer</span></div>
-            
-            {% if current_user.is_authenticated %}
-            <div class="dropdown">
-                <button class="dropbtn">Atividades ▾</button>
-                <div class="dropdown-content">
-                    <a href="/">📊 Dashboard</a>
-                    <a href="/colaboradores">👥 Equipe & Setores</a>
-                    <a href="/treinamentos">📑 Lista de Treinamentos</a>
-                </div>
-            </div>
-            {% endif %}
-        </div>
+<body>
 
-        <div class="nav-right">
-            <div class="theme-switch-wrapper">
-                <label class="theme-switch" title="Alternar Tema">
-                    <input type="checkbox" id="theme-toggle-checkbox">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            
+    <header>
+        <a href="/" class="logo-area">
+            <span></span> Ecolyzer
+        </a>
+        
+        {% if current_user.is_authenticated %}
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/treinamentos">Lista Doc</a>
+            <a href="/colaboradores">Colaboradores</a>
+        </nav>
+        {% endif %}
+
+        <div class="header-right">
             {% if current_user.is_authenticated %}
-                <a href="/logout" style="color: var(--red); font-weight: 600;">Sair</a>
+            <div class="search-container">
+                <span>🔍</span>
+                <input type="text" id="inputBuscaColaborador" placeholder="Filtrar registros na tela...">
+            </div>
+            <a href="/logout" style="color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 500;">Sair</a>
             {% else %}
-                <a href="/login" style="color: var(--primary); font-weight: 600;">Entrar</a>
+            <a href="/login" class="btn">Entrar</a>
             {% endif %}
         </div>
-    </div>
+    </header>
 
     <div class="container">
         {% block content %}{% endblock %}
     </div>
 
     <script>
-        // LÓGICA DO SWITCH
-        const themeCheckbox = document.getElementById('theme-toggle-checkbox');
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'light') {
-            document.body.classList.remove('dark-mode');
-            themeCheckbox.checked = false;
-        } else {
-            document.body.classList.add('dark-mode');
-            themeCheckbox.checked = true;
-        }
-        themeCheckbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.body.classList.remove('dark-mode');
-                localStorage.setItem('theme', 'light');
+    
+        document.addEventListener("DOMContentLoaded", function() {
+            const searchInput = document.getElementById('inputBuscaColaborador');
+            if (searchInput) {
+                searchInput.addEventListener('keyup', function(e) {
+                    const term = e.target.value.toLowerCase();
+                    const rows = document.querySelectorAll('tbody tr');
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        
+                        if (row.cells.length > 1) {
+                            row.style.display = text.includes(term) ? '' : 'none';
+                        }
+                    });
+                });
             }
         });
     </script>
