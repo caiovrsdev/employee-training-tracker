@@ -5,6 +5,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# ==========================================
+# 1. CONFIGURAÇÃO E INFRAESTRUTURA
+# ==========================================
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta')
 
@@ -17,7 +20,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
 # ==========================================
-# MODELOS DE BANCO DE DADOS
+# 2. MODELOS DE BANCO DE DADOS (Ordem Correta)
 # ==========================================
 class Usuario(db.Model, UserMixin):
     __tablename__ = 'usuarios'
@@ -59,7 +62,7 @@ with app.app_context():
     db.create_all()
 
 # ==========================================
-# ROTAS DE PÁGINAS VISUAIS
+# 3. ROTAS DE VISUALIZAÇÃO (TEMPLATES)
 # ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
@@ -88,7 +91,7 @@ def editar_treinamento(tid):
     return redirect(url_for('treinamentos_page'))
 
 # ==========================================
-# ENDPOINTS DE AUTENTICAÇÃO E CADASTROS
+# 4. ENDPOINTS DE API (Autenticação, Cadastros e Filtros)
 # ==========================================
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -99,7 +102,7 @@ def api_login():
     if user and check_password_hash(user.password, password):
         login_user(user)
         return jsonify({"success": True}), 200
-    return jsonify({"error": "Credenciais invalidas."}), 401
+    return jsonify({"error": "Credenciais inválidas."}), 401
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
@@ -108,7 +111,7 @@ def api_register():
     email = data.get('email', '').strip()
     password = data.get('password', '')
     if Usuario.query.filter_by(email=email).first():
-        return jsonify({"error": "E-mail ja cadastrado."}), 409
+        return jsonify({"error": "E-mail já cadastrado."}), 409
     
     novo_usuario = Usuario(nome=nome, email=email, password=generate_password_hash(password))
     db.session.add(novo_usuario)
@@ -137,7 +140,6 @@ def api_colaborador():
     db.session.commit()
     return jsonify({"success": True}), 201
 
-# ---> A ROTA QUE VAI SALVAR O SEU NOVO TREINAMENTO <---
 @app.route('/api/treinamento/cadastrar', methods=['POST'])
 @login_required
 def api_treinamento():
@@ -155,6 +157,30 @@ def api_treinamento():
     db.session.add(novo_treinamento)
     db.session.commit()
     return redirect(url_for('treinamentos_page'))
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+@login_required
+def api_dashboard_stats():
+    setor_id = request.args.get('setor')
+    
+    if setor_id:
+        colaboradores_query = Colaborador.query.filter_by(setor_id=int(setor_id))
+        total_colab = colaboradores_query.count()
+        colab_ids = [c.id for c in colaboradores_query.all()]
+        total_treinamentos = Treinamento.query.filter(Treinamento.colaborador_id.in_(colab_ids)).count() if colab_ids else 0
+    else:
+        total_colab = Colaborador.query.count()
+        total_treinamentos = Treinamento.query.count()
+
+    total_setores = Setor.query.count()
+    
+    return jsonify({
+        "success": True,
+        "total_colaboradores": total_colab,
+        "total_treinamentos": total_treinamentos,
+        "total_setores": total_setores,
+        "taxa_conclusao": 85 
+    }), 200
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
