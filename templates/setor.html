@@ -4,7 +4,7 @@
 <div class="topbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
     <div>
         <h1 style="margin: 0; font-size: 24px; color: var(--primary);">Setor: {{ setor.sigla }} - {{ setor.nome }}</h1>
-        <p style="margin: 5px 0 0 0; color: var(--text-dim);">Controle interno de treinamentos da Ecolyzer</p>
+        <p style="margin: 5px 0 0 0; color: var(--text-dim);">Controle interno da Ecolyzer</p>
     </div>
     <a href="/" class="btn">Voltar para Dashboard</a>
 </div>
@@ -15,20 +15,20 @@
             <thead>
                 <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
                     <th style="padding: 12px 8px;">Nome do Treinamento</th>
-                    <th style="padding: 12px 8px;">Nome do Colaborador / Realizacao / Status</th>
-                    <th style="padding: 12px 8px; width: 120px; text-align: center;">Acoes</th>
+                    <th style="padding: 12px 8px;">Colaborador / Realizacao / Status</th>
+                    <th style="padding: 12px 8px; width: 120px; text-align: center;">Acao</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in records %}
-                <tr style="border-bottom: 1px solid var(--border); transition: background-color 0.2s;">
+                <tr style="border-bottom: 1px solid var(--border);">
                     <td style="padding: 14px 8px;">
                         <strong>{{ r.treinamento.nome }}</strong>
                     </td>
                     <td style="padding: 14px 8px;">
                         <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">{{ r.colaborador.nome }}</div>
                         <div style="font-size: 12px; color: var(--text-dim);">
-                            Realizado em: {{ r.treinamento.data_realizacao if r.treinamento.data_realizacao else 'Nao realizada' }}
+                            Realizado em: {{ r.treinamento.data_realizacao if r.treinamento.data_realizacao else 'Nunca realizado' }}
                             <span style="margin-left: 8px;"></span>
                             {% if r.status == 'Valido' %}
                             <span class="chip-valido">Valido</span>
@@ -44,7 +44,7 @@
                 {% else %}
                 <tr>
                     <td colspan="3" style="text-align: center; color: var(--text-dim); padding: 30px;">
-                        Nenhum colaborador ou treinamento associado a este setor no momento.
+                        Nenhum colaborador ou treinamento vinculado a este setor.
                     </td>
                 </tr>
                 {% endfor %}
@@ -53,9 +53,9 @@
     </div>
 </div>
 
-<div id="modalAtualizar" class="modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+<div id="modalAtualizar" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
     <div style="background-color: #ffffff; margin: 10% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-        <h3 style="margin-top: 0; color: var(--primary); font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;">Atualizar Registro de Treinamento</h3>
+        <h3 style="margin-top: 0; color: var(--primary); font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;">Atualizar Registro na Ecolyzer</h3>
         
         <p style="font-size: 14px; margin-bottom: 15px; color: var(--text-main);">
             Colaborador: <strong id="modalColabNome"></strong><br>
@@ -64,13 +64,13 @@
 
         <form id="formAtualizar" method="POST" style="display: flex; flex-direction: column; gap: 15px;">
             <div>
-                <label for="modalDataRealizacao">Data de Realizacao</label>
+                <label>Data de Realizacao</label>
                 <input type="date" id="modalDataRealizacao" name="data_realizacao" required>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
-                <button type="button" onclick="fecharModalAtualizacao()" class="btn-sm">Cancelar</button>
-                <button type="submit" class="btn">Confirmar</button>
+                <button type="button" onclick="fecharModalAtualizacao()" class="btn-sm" style="padding: 10px 20px; font-size: 14px;">Cancelar</button>
+                <button type="submit" class="btn">Salvar</button>
             </div>
         </form>
     </div>
@@ -84,7 +84,6 @@
         document.getElementById('formAtualizar').action = '/api/treinamento/atualizar/' + tid;
         document.getElementById('modalAtualizar').style.display = 'block';
     }
-
     function fecharModalAtualizacao() {
         document.getElementById('modalAtualizar').style.display = 'none';
     }
