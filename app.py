@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -16,9 +15,6 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login_page'
 
-# ==========================================
-# MODELOS DE BANCO DE DADOS
-# ==========================================
 class Usuario(db.Model, UserMixin):
     __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
@@ -47,8 +43,8 @@ class Treinamento(db.Model):
     nome = db.Column(db.String(200), nullable=False)
     departamentos = db.Column(db.String(200), nullable=True)
     sigla_doc = db.Column(db.String(20), nullable=True)
-    data_aprovacao = db.Column(db.String(20), nullable=True)  # POP data aprovacao
-    data_realizacao = db.Column(db.String(20), nullable=True) # Dia do treinamento realizado
+    data_aprovacao = db.Column(db.String(20), nullable=True)
+    data_realizacao = db.Column(db.String(20), nullable=True)
     observacoes = db.Column(db.Text, nullable=True)
     colaborador_id = db.Column(db.Integer, db.ForeignKey('colaboradores.id'), nullable=True)
 
@@ -56,40 +52,31 @@ class Treinamento(db.Model):
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
-# Criação segura de tabelas
 with app.app_context():
     db.create_all()
 
-# ==========================================
-# FUNÇÕES AUXILIARES DE COMPARAÇÃO DE STATUS
-# ==========================================
 def calcular_status_treinamento(data_realizacao, data_aprovacao):
     if not data_realizacao or not data_aprovacao:
         return "Pendente"
-    try:
-        d_real = datetime.strptime(data_realizacao, "%Y-%m-%d")
-        d_aprov = datetime.strptime(data_aprovacao, "%Y-%m-%d")
-        if d_real > d_aprov:
-            return "Valido"
-        else:
-            return "Pendente"
-    except Exception:
-        if data_realizacao > data_aprovacao:
-            return "Valido"
-        return "Pendente"
+    if data_realizacao > data_aprovacao:
+        return "Valido"
+    return "Pendente"
 
 @app.context_processor
 def utility_processor():
     return dict(get_status=calcular_status_treinamento)
 
-# ==========================================
-# ROTAS DE VISUALIZAÇÃO
-# ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     return render_template('login.html')
+
+@app.route('/register', methods=['GET'])
+def register_page():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template('register.html')
 
 @app.route('/')
 @login_required
@@ -108,10 +95,7 @@ def treinamentos_page():
     all_treinamentos = Treinamento.query.all()
     
     if filtro_pendente:
-        treinamentos_filtrados = []
-        for t in all_treinamentos:
-            if calcular_status_treinamento(t.data_realizacao, t.data_aprovacao) == "Pendente":
-                treinamentos_filtrados.append(t)
+        treinamentos_filtrados = [t for t in all_treinamentos if calcular_status_treinamento(t.data_realizacao, t.data_aprovacao) == "Pendente"]
     else:
         treinamentos_filtrados = all_treinamentos
         
@@ -133,9 +117,6 @@ def view_setor(sid):
             })
     return render_template('setor.html', setor=setor, records=records)
 
-# ==========================================
-# ENDPOINTS DE API E PROCESSAMENTOS
-# ==========================================
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json(silent=True) or request.form or {}
@@ -166,22 +147,6 @@ def api_register():
 def logout():
     logout_user()
     return redirect(url_for('login_page'))
-
-@app.route('/api/setor/cadastrar', methods=['POST'])
-@login_required
-def api_setor():
-    data = request.get_json(silent=True) or request.form or {}
-    db.session.add(Setor(sigla=(data.get('sigla') or '').strip().upper(), nome=(data.get('nome') or '').strip()))
-    db.session.commit()
-    return jsonify({"success": True}), 201
-
-@app.route('/api/colaborador/cadastrar', methods=['POST'])
-@login_required
-def api_colaborador():
-    data = request.get_json(silent=True) or request.form or {}
-    db.session.add(Colaborador(nome=data.get('nome'), cargo=data.get('cargo'), setor_id=int(data.get('setor_id'))))
-    db.session.commit()
-    return jsonify({"success": True}), 201
 
 @app.route('/api/treinamento/cadastrar', methods=['POST'])
 @login_required
@@ -216,7 +181,11 @@ def api_atualizar_treinamento(tid):
 @app.route('/api/cargos', methods=['GET'])
 @login_required
 def api_cargos():
-    cargos = db.session.query(Colaborador.cargo).distinct().all()
+    setor_id = request.args.get('setor_id')
+    if setor_id:
+        cargos = db.session.query(Colaborador.cargo).filter_by(setor_id=int(setor_id)).distinct().all()
+    else:
+        cargos = db.session.query(Colaborador.cargo).distinct().all()
     return jsonify([c[0] for c in cargos if c[0]])
 
 @app.route('/api/funil', methods=['POST'])
