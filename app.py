@@ -8,7 +8,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta_ecolyzer')
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_v3_clean.db')}"
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_final_prod.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -93,12 +93,10 @@ def colaboradores_page():
 def treinamentos_page():
     filtro_pendente = request.args.get('filtro') == 'pendente'
     all_treinamentos = Treinamento.query.all()
-    
     if filtro_pendente:
         treinamentos_filtrados = [t for t in all_treinamentos if calcular_status_treinamento(t.data_realizacao, t.data_aprovacao) == "Pendente"]
     else:
         treinamentos_filtrados = all_treinamentos
-        
     return render_template('treinamentos.html', treinamentos=treinamentos_filtrados)
 
 @app.route('/setor/<int:sid>')
@@ -136,7 +134,6 @@ def api_register():
     password = data.get('password', '')
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": "E-mail ja cadastrado"}), 409
-    
     novo_usuario = Usuario(nome=nome, email=email, password=generate_password_hash(password))
     db.session.add(novo_usuario)
     db.session.commit()
@@ -154,7 +151,6 @@ def api_treinamento():
     nome = request.form.get('nome')
     if not nome:
         return redirect(url_for('treinamentos_page'))
-    
     novo_treinamento = Treinamento(
         nome=nome,
         departamentos=request.form.get('departamentos', ''),
@@ -194,16 +190,13 @@ def api_funil():
     data = request.get_json() or {}
     setor_id = data.get('setor_id')
     cargo = data.get('cargo')
-
     query = Colaborador.query
     if setor_id:
         query = query.filter_by(setor_id=int(setor_id))
     if cargo:
         query = query.filter_by(cargo=cargo)
-
     colaboradores = query.all()
     resultados = []
-
     for colab in colaboradores:
         for t in colab.treinamentos:
             status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
@@ -215,7 +208,6 @@ def api_funil():
                 "data_realizacao": t.data_realizacao or "Nao realizada",
                 "status": "Valido" if status == "Valido" else "Pendente"
             })
-
     return jsonify({"success": True, "resultados": resultados})
 
 @app.route('/api/dashboard/stats', methods=['GET'])
@@ -223,28 +215,25 @@ def api_funil():
 def api_dashboard_stats():
     total_treinamentos = Treinamento.query.count()
     total_setores = Setor.query.count()
-    
     treinamentos_all = Treinamento.query.all()
     treinamentos_pendentes = 0
     for t in treinamentos_all:
         status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
         if status == "Pendente":
             treinamentos_pendentes += 1
-
     return jsonify({
         "success": True,
         "total_treinamentos": total_treinamentos,
         "treinamentos_pendentes": treinamentos_pendentes,
         "total_setores": total_setores
     }), 200
+
 @app.route('/api/busca', methods=['GET'])
 @login_required
 def api_busca():
     termo = request.args.get('q', '').lower()
     if len(termo) < 2:
         return jsonify([])
-    
-    # Busca nomes que contenham o termo
     colaboradores = Colaborador.query.filter(Colaborador.nome.ilike(f'%{termo}%')).limit(10).all()
     resultados = [
         {
@@ -255,5 +244,6 @@ def api_busca():
         for c in colaboradores
     ]
     return jsonify(resultados)
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
