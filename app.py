@@ -237,6 +237,23 @@ def api_dashboard_stats():
         "treinamentos_pendentes": treinamentos_pendentes,
         "total_setores": total_setores
     }), 200
-
+@app.route('/api/busca', methods=['GET'])
+@login_required
+def api_busca():
+    termo = request.args.get('q', '').lower()
+    if len(termo) < 2:
+        return jsonify([])
+    
+    # Busca nomes que contenham o termo
+    colaboradores = Colaborador.query.filter(Colaborador.nome.ilike(f'%{termo}%')).limit(10).all()
+    resultados = [
+        {
+            "nome": c.nome, 
+            "setor_sigla": c.setor_ref.sigla if c.setor_ref else "Sem Setor", 
+            "setor_id": c.setor_id
+        } 
+        for c in colaboradores
+    ]
+    return jsonify(resultados)
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
