@@ -2,14 +2,8 @@
 
 {% block content %}
 <div class="topbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-    <h1 style="margin: 0; font-size: 24px; color: var(--primary);">Lista de Treinamentos - Lista Doc</h1>
-    {% if current_user.is_authenticated %}
-    <button onclick="abrirModal()" class="btn">Novo Treinamento</button>
-    {% endif %}
-</div>
-
-<div class="tip-box" style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; border-radius: 6px; margin-bottom: 30px; font-size: 14px; color: #15803d;">
-    Dica: Adicionar um treinamento aqui faz com que ele apareça automaticamente em todos os setores configurados no campo Departamentos Aplicaveis.
+    <h1 style="margin: 0; font-size: 24px; color: var(--primary);">Lista de Treinamentos (Lista Doc)</h1>
+    <button onclick="document.getElementById('modalTreinamento').style.display = 'block';" class="btn">Novo Treinamento</button>
 </div>
 
 <div class="card-box" style="background: #ffffff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.01);">
@@ -17,10 +11,8 @@
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
                 <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
-                    <th style="padding: 12px 8px; width: 50px;">#</th>
-                    <th style="padding: 12px 8px;">Codigo / Nome</th>
+                    <th style="padding: 12px 8px;">Nome do Treinamento</th>
                     <th style="padding: 12px 8px;">Departamentos Aplicaveis</th>
-                    <th style="padding: 12px 8px;">Sigla Doc</th>
                     <th style="padding: 12px 8px;">Data de Aprovacao</th>
                     <th style="padding: 12px 8px;">Realizado em</th>
                     <th style="padding: 12px 8px;">Status</th>
@@ -28,13 +20,11 @@
             </thead>
             <tbody>
                 {% for t in treinamentos %}
-                <tr style="border-bottom: 1px solid var(--border); transition: background-color 0.2s;">
-                    <td style="padding: 14px 8px;">{{ loop.index }}</td>
+                <tr style="border-bottom: 1px solid var(--border);">
                     <td style="padding: 14px 8px;"><strong>{{ t.nome }}</strong></td>
                     <td style="padding: 14px 8px;">{{ t.departamentos if t.departamentos else '-' }}</td>
-                    <td style="padding: 14px 8px;"><span class="chip">{{ t.sigla_doc if t.sigla_doc else '-' }}</span></td>
                     <td style="padding: 14px 8px;">{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
-                    <td style="padding: 14px 8px;">{{ t.data_realizacao if t.data_realizacao else '-' }}</td>
+                    <td style="padding: 14px 8px;">{{ t.data_realizacao if t.data_realizacao else 'Nao realizada' }}</td>
                     <td style="padding: 14px 8px;">
                         {% set status = get_status(t.data_realizacao, t.data_aprovacao) %}
                         {% if status == 'Valido' %}
@@ -46,8 +36,8 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 30px;">
-                        Nenhum treinamento cadastrado.
+                    <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                        Nenhum treinamento listado na base da Ecolyzer.
                     </td>
                 </tr>
                 {% endfor %}
@@ -56,19 +46,14 @@
     </div>
 </div>
 
-<div id="modalTreinamento" class="modal">
-    <div class="modal-content">
+<div id="modalTreinamento" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div style="background-color:#ffffff; margin: 6% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
         <h2 style="margin-top: 0; color: var(--primary); font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;">Cadastrar Novo Treinamento</h2>
         
         <form action="{{ url_for('api_treinamento') }}" method="POST" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
             <div>
                 <label>Nome do Treinamento</label>
-                <input type="text" name="nome" required placeholder="Ex: POP Trabalho em Altura">
-            </div>
-
-            <div>
-                <label>Departamentos Aplicaveis</label>
-                <input type="text" name="departamentos" placeholder="Ex: Operacoes, Logistica">
+                <input type="text" name="nome" required placeholder="Ex: Procedimento Trabalho em Altura">
             </div>
 
             <div style="display: flex; gap: 15px;">
@@ -83,19 +68,10 @@
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
-                <button type="button" onclick="fecharModal()" class="btn-sm">Cancelar</button>
-                <button type="submit" class="btn">Salvar Treinamento</button>
+                <button type="button" onclick="document.getElementById('modalTreinamento').style.display = 'none';" class="btn-sm" style="padding: 10px 20px; font-size: 14px;">Cancelar</button>
+                <button type="submit" class="btn">Salvar</button>
             </div>
         </form>
     </div>
 </div>
-
-<script>
-    function abrirModal() {
-        document.getElementById('modalTreinamento').style.display = 'block';
-    }
-    function fecharModal() {
-        document.getElementById('modalTreinamento').style.display = 'none';
-    }
-</script>
 {% endblock %}
