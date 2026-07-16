@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro - Ecolyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .login-card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            color: #004b93;
+            font-size: 28px;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .login-header p {
+            color: #64748b;
+            font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            font-size: 14px;
+            color: #1e293b;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            background-color: #ffffff;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        input:focus {
+            border-color: #0066cc;
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+        }
+
+        .btn-submit {
+            background-color: #004b93;
+            color: white;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            background-color: #0066cc;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .login-footer a {
+            color: #0066cc;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <h1>Cadastro</h1>
+            <p>Crie sua conta na Ecolyzer</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="formRegister" onsubmit="executarCadastro(event)">
+            <div class="form-group">
+                <label>Nome Completo</label>
+                <input type="text" id="nome" required placeholder="Seu nome">
+            </div>
+
+            <div class="form-group">
+                <label>E-mail</label>
+                <input type="email" id="email" required placeholder="Seu e-mail corporativo">
+            </div>
+
+            <div class="form-group">
+                <label>Senha</label>
+                <input type="password" id="password" required placeholder="Crie uma senha forte">
+            </div>
+
+            <button type="submit" class="btn-submit">Criar Conta</button>
+        </form>
+
+        <div class="login-footer">
+            Ja possui registro? <a href="/login">Entrar na Ecolyzer</a>
+        </div>
+    </div>
+
+    <script>
+        function executarCadastro(event) {
+            event.preventDefault();
+            const nome = document.getElementById('nome').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+
+            errorDiv.style.display = 'none';
+
+            fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: nome, email: email, password: password })
+            })
+            .then(res => {
+                if (res.ok) { window.location.href = '/login'; } 
+                else { return res.json().then(data => { throw new Error(data.error || 'Erro ao cadastrar'); }); }
+            })
+            .catch(err => {
+                errorDiv.textContent = err.message;
+                errorDiv.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>
