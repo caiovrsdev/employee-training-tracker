@@ -9,20 +9,13 @@ app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta_ecolyzer'
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# 1. FORÇAR EXCLUSÃO DE BANCOS DE DADOS ANTIGOS PARA LIMPAR O SERVIDOR
-bancos_para_limpar = ['ecolyzer_final_prod.db', 'treinamentos.db', 'instance/ecolyzer_final_prod.db', 'instance/treinamentos.db']
-for db_nome in bancos_para_limpar:
-    caminho_completo = os.path.join(basedir, db_nome)
-    if os.path.exists(caminho_completo):
-        try:
-            os.remove(caminho_completo)
-        except Exception:
-            pass
-
-# 2. DEFINIR O NOVO BANCO DE DADOS LIMPO
+# Banco de Dados Limpo
 db_nome_limpo = 'ecolyzer_v2_clean.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, db_nome_limpo)}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Trava anti-bloqueio para o SQLite no servidor gratuito do Render
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 15}}
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -48,7 +41,7 @@ class Colaborador(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     cargo = db.Column(db.String(50), nullable=False)
     setor_id = db.Column(db.Integer, db.ForeignKey('setores.id'), nullable=False)
-    treinamentos = db.relationship('Treinamento', backref='colaborador_ref', lazy=True)
+    treinamentos = db.relationship('Treinamento', backref='colaborador_ref', lazy=True, cascade="all, delete-orphan")
 
 class Treinamento(db.Model):
     __tablename__ = 'treinamentos'
@@ -164,6 +157,50 @@ def logout():
     logout_user()
     return redirect(url_for('login_page'))
 
+# -------------------------------------------------------------
+# ROTAS QUE ESTAVAM FALTANTES: CADASTRO DE SETOR E COLABORADOR
+# -------------------------------------------------------------
+@app.route('/api/setor/cadastrar', methods=['POST'])
+@app.route('/setor/cadastrar', methods=['POST'])
+@login_required
+def api_cadastrar_setor():
+    sigla = request.form.get('sigla')
+    nome = request.form.get('nome')
+    
+    if not sigla or not nome:
+        return redirect(url_for('index'))
+        
+    try:
+        novo_setor = Setor(sigla=sigla.upper(), nome=nome)
+        db.session.add(novo_setor)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        pass
+        
+    return redirect(url_for('index'))
+
+@app.route('/api/colaborador/cadastrar', methods=['POST'])
+@app.route('/colaborador/cadastrar', methods=['POST'])
+@login_required
+def api_cadastrar_colaborador():
+    nome = request.form.get('nome')
+    cargo = request.form.get('cargo')
+    setor_id = request.form.get('setor_id')
+    
+    if not nome or not cargo or not setor_id:
+        return redirect(url_for('colaboradores_page'))
+        
+    try:
+        novo_colab = Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id))
+        db.session.add(novo_colab)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        
+    return redirect(url_for('colaboradores_page'))
+# -------------------------------------------------------------
+
 @app.route('/api/treinamento/cadastrar', methods=['POST'])
 @login_required
 def api_treinamento():
@@ -181,7 +218,7 @@ def api_treinamento():
     )
     db.session.add(novo_treinamento)
     db.session.commit()
-    return redirect(url_for('treinamentos_page'))
+    return redirect(request.referrer or url_for('treinamentos_page'))
 
 @app.route('/api/treinamento/atualizar/<int:tid>', methods=['POST'])
 @login_required
