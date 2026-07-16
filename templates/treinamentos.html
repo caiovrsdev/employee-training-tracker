@@ -6,38 +6,29 @@
     <button onclick="document.getElementById('modalTreinamento').style.display = 'block';" class="btn">Novo Treinamento</button>
 </div>
 
-<div class="card-box" style="background: #ffffff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.01);">
+<div class="card-box" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.01);">
     <div class="table-wrap" style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
                 <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
+                    <th style="padding: 12px 8px;">Sigla</th>
                     <th style="padding: 12px 8px;">Nome do Treinamento</th>
-                    <th style="padding: 12px 8px;">Departamentos Aplicaveis</th>
-                    <th style="padding: 12px 8px;">Data de Aprovacao</th>
-                    <th style="padding: 12px 8px;">Realizado em</th>
-                    <th style="padding: 12px 8px;">Status</th>
+                    <th style="padding: 12px 8px;">Departamentos Aplicáveis</th>
+                    <th style="padding: 12px 8px;">Data de Aprovação</th>
                 </tr>
             </thead>
             <tbody>
                 {% for t in treinamentos %}
                 <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 14px 8px; font-weight: 600; color: var(--primary);">{{ t.sigla_doc if t.sigla_doc else '-' }}</td>
                     <td style="padding: 14px 8px;"><strong>{{ t.nome }}</strong></td>
                     <td style="padding: 14px 8px;">{{ t.departamentos if t.departamentos else '-' }}</td>
                     <td style="padding: 14px 8px;">{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
-                    <td style="padding: 14px 8px;">{{ t.data_realizacao if t.data_realizacao else 'Nao realizada' }}</td>
-                    <td style="padding: 14px 8px;">
-                        {% set status = get_status(t.data_realizacao, t.data_aprovacao) %}
-                        {% if status == 'Valido' %}
-                        <span class="chip-valido">Valido</span>
-                        {% else %}
-                        <span class="chip-pendente">Pendente</span>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 30px;">
-                        Nenhum treinamento listado na base da Ecolyzer.
+                    <td colspan="4" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                        Nenhum documento listado na base da Ecolyzer.
                     </td>
                 </tr>
                 {% endfor %}
@@ -46,25 +37,30 @@
     </div>
 </div>
 
-<div id="modalTreinamento" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
-    <div style="background-color:#ffffff; margin: 6% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-        <h2 style="margin-top: 0; color: var(--primary); font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;">Cadastrar Novo Treinamento</h2>
+<div id="modalTreinamento" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background-color: var(--card-bg); margin: 6% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <h2 style="margin-top: 0; color: var(--primary); font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;">Cadastrar Novo Documento</h2>
         
         <form action="{{ url_for('api_treinamento') }}" method="POST" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-            <div>
-                <label>Nome do Treinamento</label>
-                <input type="text" name="nome" required placeholder="Ex: Procedimento Trabalho em Altura">
-            </div>
-
             <div style="display: flex; gap: 15px;">
                 <div style="flex: 1;">
                     <label>Sigla Doc</label>
-                    <input type="text" name="sigla_doc" placeholder="POP-TI-01">
+                    <input type="text" name="sigla_doc" placeholder="POP-TI-01" required>
                 </div>
-                <div style="flex: 1;">
-                    <label>Data de Aprovacao</label>
-                    <input type="date" name="data_aprovacao">
+                <div style="flex: 2;">
+                    <label>Nome do Treinamento</label>
+                    <input type="text" name="nome" required placeholder="Ex: Procedimento em Altura">
                 </div>
+            </div>
+
+            <div>
+                <label>Departamentos Aplicáveis</label>
+                <input type="text" name="departamentos" placeholder="Ex: GQ, Produção, Manutenção" required>
+            </div>
+
+            <div>
+                <label>Data de Aprovação</label>
+                <input type="date" name="data_aprovacao" required>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
