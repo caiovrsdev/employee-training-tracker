@@ -1,6 +1,73 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .filter-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .filter-icon {
+        cursor: pointer;
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-left: 8px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: var(--background);
+        border: 1px solid var(--border);
+    }
+    .filter-icon:hover {
+        background: var(--border);
+        color: var(--primary);
+    }
+    .filter-dropdown-menu {
+        display: none;
+        position: absolute;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: 10px;
+        z-index: 1000;
+        max-height: 250px;
+        overflow-y: auto;
+        min-width: 180px;
+    }
+    .filter-dropdown-menu.show {
+        display: block;
+    }
+    .filter-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px;
+        font-size: 13px;
+        color: var(--text-main);
+        cursor: pointer;
+    }
+    .filter-option input {
+        width: auto !important;
+    }
+    .filter-option:hover {
+        background: var(--background);
+    }
+    .filter-action-btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 6px;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--primary) !important;
+        color: #fff !important;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+</style>
+
 <div class="topbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
     <h1 style="margin: 0; font-size: 24px; color: var(--primary);">Lista de Treinamentos (Lista Doc)</h1>
     <button onclick="document.getElementById('modalTreinamento').style.display = 'block';" class="btn">Novo Treinamento</button>
@@ -11,10 +78,34 @@
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
                 <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
-                    <th style="padding: 12px 8px;">Sigla</th>
-                    <th style="padding: 12px 8px;">Nome do Treinamento</th>
-                    <th style="padding: 12px 8px;">Departamentos Aplicáveis</th>
-                    <th style="padding: 12px 8px;">Data de Aprovação</th>
+                    <th style="padding: 12px 8px; position: relative;">
+                        <div class="filter-header">
+                            <span>Sigla</span>
+                            <span class="filter-icon" onclick="toggleExcelFilter(0, event)">▼</span>
+                        </div>
+                        <div id="excel-filter-0" class="filter-dropdown-menu"></div>
+                    </th>
+                    <th style="padding: 12px 8px; position: relative;">
+                        <div class="filter-header">
+                            <span>Nome do Treinamento</span>
+                            <span class="filter-icon" onclick="toggleExcelFilter(1, event)">▼</span>
+                        </div>
+                        <div id="excel-filter-1" class="filter-dropdown-menu"></div>
+                    </th>
+                    <th style="padding: 12px 8px; position: relative;">
+                        <div class="filter-header">
+                            <span>Departamentos Aplicáveis</span>
+                            <span class="filter-icon" onclick="toggleExcelFilter(2, event)">▼</span>
+                        </div>
+                        <div id="excel-filter-2" class="filter-dropdown-menu"></div>
+                    </th>
+                    <th style="padding: 12px 8px; position: relative;">
+                        <div class="filter-header">
+                            <span>Data de Aprovação</span>
+                            <span class="filter-icon" onclick="toggleExcelFilter(3, event)">▼</span>
+                        </div>
+                        <div id="excel-filter-3" class="filter-dropdown-menu"></div>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -70,4 +161,97 @@
         </form>
     </div>
 </div>
+
+<script>
+    let activeFilters = {};
+
+    function toggleExcelFilter(colIndex, event) {
+        event.stopPropagation();
+        document.querySelectorAll('.filter-dropdown-menu').forEach(menu => {
+            if (menu.id !== `excel-filter-${colIndex}`) {
+                menu.classList.remove('show');
+            }
+        });
+        
+        const menu = document.getElementById(`excel-filter-${colIndex}`);
+        if (menu.classList.contains('show')) {
+            menu.classList.remove('show');
+            return;
+        }
+
+        const rect = event.target.getBoundingClientRect();
+        menu.style.top = (window.scrollY + rect.bottom + 5) + 'px';
+        menu.style.left = (window.scrollX + rect.left - 120) + 'px';
+
+        const rows = Array.from(document.querySelectorAll('tbody tr'));
+        const values = new Set();
+        rows.forEach(row => {
+            if (row.cells.length > colIndex) {
+                const val = row.cells[colIndex].textContent.trim();
+                if (val && row.cells.length > 1) values.add(val);
+            }
+        });
+
+        const sortedValues = Array.from(values).sort();
+        let html = `
+            <div class="filter-option">
+                <input type="checkbox" id="all-col-${colIndex}" onchange="toggleSelectAll(${colIndex}, this)" checked>
+                <label for="all-col-${colIndex}"><strong>(Selecionar Tudo)</strong></label>
+            </div>
+            <div style="border-bottom: 1px solid var(--border); margin: 5px 0;"></div>
+        `;
+
+        sortedValues.forEach((val, i) => {
+            const isChecked = !activeFilters[colIndex] || activeFilters[colIndex].includes(val);
+            html += `
+                <div class="filter-option">
+                    <input type="checkbox" class="col-${colIndex}-chk" value="${val}" id="opt-${colIndex}-${i}" ${isChecked ? 'checked' : ''}>
+                    <label for="opt-${colIndex}-${i}">${val}</label>
+                </div>
+            `;
+        });
+
+        html += `<button class="filter-action-btn" onclick="applyExcelFilter(${colIndex})">Aplicar</button>`;
+        menu.innerHTML = html;
+        menu.classList.add('show');
+    }
+
+    function toggleSelectAll(colIndex, master) {
+        document.querySelectorAll(`.col-${colIndex}-chk`).forEach(chk => {
+            chk.checked = master.checked;
+        });
+    }
+
+    function applyExcelFilter(colIndex) {
+        const checkedBoxes = document.querySelectorAll(`.col-${colIndex}-chk:checked`);
+        const checkedValues = Array.from(checkedBoxes).map(chk => chk.value);
+        activeFilters[colIndex] = checkedValues;
+        
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            if (row.cells.length <= 1) return;
+            let matchesAll = true;
+            for (let col in activeFilters) {
+                if (row.cells.length > col) {
+                    const cellVal = row.cells[col].textContent.trim();
+                    if (activeFilters[col].length > 0 && !activeFilters[col].includes(cellVal)) {
+                        matchesAll = false;
+                        break;
+                    }
+                }
+            }
+            row.style.display = matchesAll ? '' : 'none';
+        });
+
+        document.getElementById(`excel-filter-${colIndex}`).classList.remove('show');
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.filter-dropdown-menu') && !e.target.closest('.filter-icon')) {
+            document.querySelectorAll('.filter-dropdown-menu').forEach(menu => {
+                menu.classList.remove('show');
+            });
+        }
+    });
+</script>
 {% endblock %}
