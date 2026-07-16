@@ -257,8 +257,6 @@ def api_busca():
         for c in colaboradores
     ]
     return jsonify(resultados)
-with app.app_context():
-    db.drop_all()
-    db.create_all()
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
