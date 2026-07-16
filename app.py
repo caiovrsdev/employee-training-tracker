@@ -13,8 +13,6 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 db_nome_limpo = 'ecolyzer_v2_clean.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, db_nome_limpo)}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Trava anti-bloqueio para o SQLite no servidor gratuito do Render
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 15}}
 
 db = SQLAlchemy(app)
@@ -111,11 +109,14 @@ def treinamentos_page():
         treinamentos_filtrados = all_treinamentos
     return render_template('treinamentos.html', treinamentos=treinamentos_filtrados)
 
+# CORREÇÃO 1: Injeção das variáveis na Matriz para evitar Erro 500
 @app.route('/setor/<int:sid>')
 @login_required
 def view_setor(sid):
     setor = Setor.query.get_or_404(sid)
     colaboradores = Colaborador.query.filter_by(setor_id=sid).all()
+    treinamentos = Treinamento.query.all() # <- Essencial para a tabela do HTML
+    
     records = []
     for colab in colaboradores:
         for t in colab.treinamentos:
@@ -125,7 +126,12 @@ def view_setor(sid):
                 "treinamento": t,
                 "status": status
             })
-    return render_template('setor.html', setor=setor, records=records)
+            
+    return render_template('setor.html', 
+                           setor=setor, 
+                           colaboradores=colaboradores, 
+                           treinamentos=treinamentos, 
+                           records=records)
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -157,27 +163,20 @@ def logout():
     logout_user()
     return redirect(url_for('login_page'))
 
-# -------------------------------------------------------------
-# ROTAS QUE ESTAVAM FALTANTES: CADASTRO DE SETOR E COLABORADOR
-# -------------------------------------------------------------
 @app.route('/api/setor/cadastrar', methods=['POST'])
 @app.route('/setor/cadastrar', methods=['POST'])
 @login_required
 def api_cadastrar_setor():
     sigla = request.form.get('sigla')
     nome = request.form.get('nome')
-    
     if not sigla or not nome:
         return redirect(url_for('index'))
-        
     try:
         novo_setor = Setor(sigla=sigla.upper(), nome=nome)
         db.session.add(novo_setor)
         db.session.commit()
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        pass
-        
     return redirect(url_for('index'))
 
 @app.route('/api/colaborador/cadastrar', methods=['POST'])
@@ -187,26 +186,29 @@ def api_cadastrar_colaborador():
     nome = request.form.get('nome')
     cargo = request.form.get('cargo')
     setor_id = request.form.get('setor_id')
-    
     if not nome or not cargo or not setor_id:
         return redirect(url_for('colaboradores_page'))
-        
     try:
         novo_colab = Colaborador(nome=nome, cargo=cargo, setor_id=int(setor_id))
         db.session.add(novo_colab)
         db.session.commit()
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        
     return redirect(url_for('colaboradores_page'))
-# -------------------------------------------------------------
 
 @app.route('/api/treinamento/cadastrar', methods=['POST'])
 @login_required
 def api_treinamento():
     nome = request.form.get('nome')
     if not nome:
-        return redirect(url_for('treinamentos_page'))
+        return redirect(request.referrer or url_for('treinamentos_page'))
+        
+    colab_id = request.form.get('colaborador_id')
+    if colab_id and str(colab_id).isdigit():
+        colab_id = int(colab_id)
+    else:
+        colab_id = None
+
     novo_treinamento = Treinamento(
         nome=nome,
         departamentos=request.form.get('departamentos', ''),
@@ -214,7 +216,7 @@ def api_treinamento():
         data_aprovacao=request.form.get('data_aprovacao', ''),
         data_realizacao=request.form.get('data_realizacao', ''),
         observacoes=request.form.get('observacoes', ''),
-        colaborador_id=request.form.get('colaborador_id')
+        colaborador_id=colab_id
     )
     db.session.add(novo_treinamento)
     db.session.commit()
@@ -240,30 +242,48 @@ def api_cargos():
         cargos = db.session.query(Colaborador.cargo).distinct().all()
     return jsonify([c[0] for c in cargos if c[0]])
 
+# CORREÇÃO 2: Lógica do Funil arrumada
 @app.route('/api/funil', methods=['POST'])
 @login_required
 def api_funil():
     data = request.get_json() or {}
     setor_id = data.get('setor_id')
     cargo = data.get('cargo')
+    
     query = Colaborador.query
-    if setor_id:
+    
+    # Proteção caso o frontend envie "all" ou string vazia
+    if setor_id and str(setor_id).isdigit():
         query = query.filter_by(setor_id=int(setor_id))
-    if cargo:
+    if cargo and str(cargo).strip() != '' and str(cargo).lower() != 'all':
         query = query.filter_by(cargo=cargo)
+        
     colaboradores = query.all()
     resultados = []
+    
     for colab in colaboradores:
-        for t in colab.treinamentos:
-            status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
+        # Mostra o colaborador no funil MESMO que ele não tenha treinamentos
+        if not colab.treinamentos:
             resultados.append({
                 "colaborador_nome": colab.nome,
                 "cargo": colab.cargo,
                 "setor_sigla": colab.setor_ref.sigla if colab.setor_ref else "",
-                "treinamento_nome": t.nome,
-                "data_realizacao": t.data_realizacao or "Nao realizada",
-                "status": "Valido" if status == "Valido" else "Pendente"
+                "treinamento_nome": "Nenhum treinamento vinculado",
+                "data_realizacao": "-",
+                "status": "Pendente"
             })
+        else:
+            for t in colab.treinamentos:
+                status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
+                resultados.append({
+                    "colaborador_nome": colab.nome,
+                    "cargo": colab.cargo,
+                    "setor_sigla": colab.setor_ref.sigla if colab.setor_ref else "",
+                    "treinamento_nome": t.nome,
+                    "data_realizacao": t.data_realizacao or "Não realizada",
+                    "status": "Valido" if status == "Valido" else "Pendente"
+                })
+                
     return jsonify({"success": True, "resultados": resultados})
 
 @app.route('/api/dashboard/stats', methods=['GET'])
