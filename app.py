@@ -79,6 +79,12 @@ def calcular_status_treinamento(data_realizacao, data_aprovacao):
 def utility_processor():
     return dict(get_status=calcular_status_treinamento)
 
+@app.route('/limpar-banco-secreto-agora')
+def limpar_banco():
+    db.drop_all()
+    db.create_all()
+    return "<h1>BANCO DE DADOS LIMPO COM SUCESSO!</h1><p>O site está zerado. Pode voltar e criar seu usuário.</p>"
+
 @app.route('/login', methods=['GET'])
 def login_page():
     if current_user.is_authenticated:
