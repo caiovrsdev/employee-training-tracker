@@ -8,7 +8,20 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta_ecolyzer')
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ecolyzer_final_prod.db')}"
+
+# 1. FORÇAR EXCLUSÃO DE BANCOS DE DADOS ANTIGOS PARA LIMPAR O SERVIDOR
+bancos_para_limpar = ['ecolyzer_final_prod.db', 'treinamentos.db', 'instance/ecolyzer_final_prod.db', 'instance/treinamentos.db']
+for db_nome in bancos_para_limpar:
+    caminho_completo = os.path.join(basedir, db_nome)
+    if os.path.exists(caminho_completo):
+        try:
+            os.remove(caminho_completo)
+        except Exception:
+            pass
+
+# 2. DEFINIR O NOVO BANCO DE DADOS LIMPO
+db_nome_limpo = 'ecolyzer_v2_clean.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, db_nome_limpo)}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
