@@ -1,4 +1,5 @@
 import os
+import traceback
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -109,29 +110,39 @@ def treinamentos_page():
         treinamentos_filtrados = all_treinamentos
     return render_template('treinamentos.html', treinamentos=treinamentos_filtrados)
 
-# CORREÇÃO 1: Injeção das variáveis na Matriz para evitar Erro 500
 @app.route('/setor/<int:sid>')
 @login_required
 def view_setor(sid):
-    setor = Setor.query.get_or_404(sid)
-    colaboradores = Colaborador.query.filter_by(setor_id=sid).all()
-    treinamentos = Treinamento.query.all() # <- Essencial para a tabela do HTML
-    
-    records = []
-    for colab in colaboradores:
-        for t in colab.treinamentos:
-            status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
-            records.append({
-                "colaborador": colab,
-                "treinamento": t,
-                "status": status
-            })
-            
-    return render_template('setor.html', 
-                           setor=setor, 
-                           colaboradores=colaboradores, 
-                           treinamentos=treinamentos, 
-                           records=records)
+    try:
+        setor = Setor.query.get_or_404(sid)
+        colaboradores = Colaborador.query.filter_by(setor_id=sid).all()
+
+        treinamentos_unicos = db.session.query(Treinamento.nome).distinct().all()
+        nomes_treinamentos = [t[0] for t in treinamentos_unicos]
+        
+        treinamentos = Treinamento.query.all() 
+        
+        records = []
+        for colab in colaboradores:
+            for t in colab.treinamentos:
+                status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
+                records.append({
+                    "colaborador": colab,
+                    "treinamento": t,
+                    "status": status
+                })
+                
+        return render_template('setor.html', 
+                               setor=setor, 
+                               colaboradores=colaboradores, 
+                               treinamentos=treinamentos,
+                               nomes_treinamentos=nomes_treinamentos,
+                               records=records)
+                               
+    except Exception as e:
+        # Se o Jinja ou o Python quebrarem, essa linha vai cuspir a resposta na tela!
+        erro_completo = traceback.format_exc()
+        return f"<h1>RAIO-X DO ERRO 500:</h1><p>O seu HTML quebrou pelo seguinte motivo:</p><pre style='background:#f4f4f4; padding:20px; border-radius:8px; font-size:14px;'>{erro_completo}</pre>", 500
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
