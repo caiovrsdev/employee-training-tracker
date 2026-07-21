@@ -104,37 +104,40 @@ def treinamentos_page():
         treinamentos_filtrados = all_treinamentos
     return render_template('treinamentos.html', treinamentos=treinamentos_filtrados)
 
-@app.route('/importar_excel', methods=['POST'])
-@login.required
+import openpyxl
+from flask import flash, request, redirect, url_for
+
+@app.route('/importar-excel', methods=['POST'])
+@login_required
 def importar_excel():
-if 'file' not in request.files:
-    flash('Nenhum arquivo enviado', 'danger')
-    return redirect(url_for('index'))
+    if 'file' not in request.files:
+        flash('Nenhum arquivo enviado', 'danger')
+        return redirect(url_for('index'))
     
     file = request.files['file']
     if file.filename == '':
-        flash('Nenhum arquivo selecionado','danger')
-        retur redirect(url_for('index'))
+        flash('Nenhum arquivo selecionado', 'danger')
+        return redirect(url_for('index'))
+        
+    if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+        try:
+            wb = openpyxl.load_workbook(file)
+            sheet = wb.active
 
-if file and (file.filename.endswith('xlsx') or file.filename.endswith ('xls')):
-    try:
-        wb = openpyxl.load_workbook(file)
-        sheet = wb.active
-
-for row in sheet.iter_rows(min_row=2, values_only=True):
-    if not row[0]:
-        continue
-
-    nome_colaborador = row[0]
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if not row[0]:
+                    continue
+                
+                nome_colaborador = row[0]
                 nome_setor = row[1] if len(row) > 1 and row[1] else "Geral"
                 nome_treinamento = row[2] if len(row) > 2 and row[2] else "Treinamento Padrão"
-                
+
                 setor_obj = Setor.query.filter_by(nome=nome_setor).first()
                 if not setor_obj:
                     setor_obj = Setor(nome=nome_setor)
                     db.session.add(setor_obj)
                     db.session.commit()
-                
+
                 colab_obj = Colaborador.query.filter_by(nome=nome_colaborador).first()
                 if not colab_obj:
                     colab_obj = Colaborador(nome=nome_colaborador, setor_id=setor_obj.id)
@@ -157,7 +160,6 @@ for row in sheet.iter_rows(min_row=2, values_only=True):
             flash(f'Erro ao processar planilha: {str(e)}', 'danger')
             
     return redirect(url_for('index'))
-
 
 @app.route('/setor/<int:sid>')
 @login_required
