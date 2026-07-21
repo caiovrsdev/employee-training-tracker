@@ -11,7 +11,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'chave_dev_super_secreta_ecolyzer'
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Banco de Dados Limpo
 db_nome_limpo = 'ecolyzer_v2_clean.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, db_nome_limpo)}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -107,7 +106,7 @@ def treinamentos_page():
 
 @app.route('/importar_excel', methods=['POST'])
 @login.required
-def importar.excel():
+def importar_excel():
 if 'file' not in request.files:
     flash('Nenhum arquivo enviado', 'danger')
     return redirect(url_for('index'))
