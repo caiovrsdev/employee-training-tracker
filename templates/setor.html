@@ -38,7 +38,7 @@
                         </div>
                     </td>
                     <td style="padding: 14px 8px; text-align: center;">
-                        <button onclick="abrirModalAtualizacao('{{ r.treinamento.id }}', '{{ r.colaborador.nome }}', '{{ r.treinamento.nome }}', '{{ r.treinamento.data_realizacao if r.treinamento.data_realizacao else \'\' }}')" class="btn-sm">Atualizar</button>
+                        <button onclick="abrirModalAtualizacao('{{ r.treinamento.id }}', '{{ r.colaborador.nome }}', '{{ r.treinamento.nome }}', '{{ r.treinamento.data_realizacao if r.treinamento.data_realizacao else }}')" class="btn-sm">Atualizar</button>
                     </td>
                 </tr>
                 {% else %}
