@@ -1,5 +1,6 @@
 import os
 import openpyxl
+from flask import send_from_directory
 import traceback
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -107,12 +108,13 @@ def treinamentos_page():
 import openpyxl
 from flask import flash, request, redirect, url_for
 
-@app.route('/importar-excel', methods=['POST'])
+@app.route('/baixar_modelo')
 @login_required
-def importar_excel():
-    if 'file' not in request.files:
-        flash('Nenhum arquivo enviado', 'danger')
-        return redirect(url_for('index'))
+def baixar_modelo():
+    try:
+        return send_from_directory(directory='.', path='modelo.xlsx', as_attachment=True)
+    except Exception as e:
+        return f"Arquivo modelo não encontrado: {str(e)}", 404
     
     file = request.files['file']
     if file.filename == '':
