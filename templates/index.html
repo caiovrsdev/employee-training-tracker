@@ -80,7 +80,7 @@
 
 <div class="dashboard-header">
     <div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: var(--primary);">Ola, {{ current_user.nome }}</h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: var(--primary);">Olá, {{ current_user.nome }}</h1>
         <p style="margin: 5px 0 0 0; color: var(--text-dim);">Bem-vindo ao controle de treinamentos da Ecolyzer</p>
     </div>
 </div>
@@ -102,10 +102,10 @@
 
 <div class="funnel-bar">
     <div style="flex: 1;">
-        <h3 style="margin: 0 0 5px 0; font-size: 16px; color: var(--text-main);">Busca Avancada</h3>
+        <h3 style="margin: 0 0 5px 0; font-size: 16px; color: var(--text-main);">Busca Avançada</h3>
         <p style="margin: 0; font-size: 13px; color: var(--text-dim);">Filtre os resultados corporativos por Setor e Cargo</p>
     </div>
-    <button onclick="abrirModalFunil()" class="btn">Filtragem Funil</button>
+    <button onclick="abrirModalFunil()" class="btn">Filtragem</button>
 </div>
 
 <h2 class="sector-section-title">Selecione um Setor para Visualizacao Direta</h2>
@@ -117,7 +117,7 @@
     </a>
     {% else %}
     <div style="grid-column: 1/-1; background: #fff; padding: 30px; border-radius: 8px; border: 1px dashed var(--border); text-align: center; color: var(--text-dim);">
-        Nenhum setor cadastrado na Ecolyzer no momento.
+        Nenhum setor cadastrado no momento.
     </div>
     {% endfor %}
 </div>
@@ -125,7 +125,7 @@
 <div id="modalFunil" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">Filtragem de Funil da Ecolyzer</h3>
+            <h3 class="modal-title">Filtragem de Funil</h3>
             <button onclick="fecharModalFunil()" class="close-btn">X</button>
         </div>
         
