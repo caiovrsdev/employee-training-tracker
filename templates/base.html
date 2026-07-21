@@ -376,7 +376,17 @@
             </nav>
             {% endif %}
         </div>
-
+        
+    </div>
+        <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data" class="d-inline-flex align-items-center ms-3">
+    <input type="file" name="file" accept=".xlsx, .xls" id="excel-import" style="display: none;" onchange="this.form.submit()">
+    
+    <label for="excel-import" class="btn btn-success btn-sm mb-0 d-flex align-items-center gap-2 shadow-sm" style="cursor: pointer; transition: 0.3s;">
+        <i class="fas fa-file-excel"></i> Importar Excel
+    </label>
+</form>
+    </div>
+        
         <div class="header-right">
             <div class="theme-wrapper">
                 <span class="theme-label" id="themeText">Switch</span>
