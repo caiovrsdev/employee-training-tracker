@@ -2,7 +2,7 @@ import os
 import openpyxl
 from flask import send_from_directory
 import traceback
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -105,63 +105,28 @@ def treinamentos_page():
         treinamentos_filtrados = all_treinamentos
     return render_template('treinamentos.html', treinamentos=treinamentos_filtrados)
 
-import openpyxl
-from flask import flash, request, redirect, url_for
-
-@app.route('/baixar_modelo')
+@app.route('/baixar-modelo')
 @login_required
 def baixar_modelo():
-    try:
-        return send_from_directory(directory='.', path='modelo.xlsx', as_attachment=True)
-    except Exception as e:
-        return f"Arquivo modelo não encontrado: {str(e)}", 404
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Modelo de Treinamentos"
     
-    file = request.files['file']
-    if file.filename == '':
-        flash('Nenhum arquivo selecionado', 'danger')
-        return redirect(url_for('index'))
-        
-    if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-        try:
-            wb = openpyxl.load_workbook(file)
-            sheet = wb.active
-
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                if not row[0]:
-                    continue
-                
-                nome_colaborador = row[0]
-                nome_setor = row[1] if len(row) > 1 and row[1] else "Geral"
-                nome_treinamento = row[2] if len(row) > 2 and row[2] else "Treinamento Padrão"
-
-                setor_obj = Setor.query.filter_by(nome=nome_setor).first()
-                if not setor_obj:
-                    setor_obj = Setor(nome=nome_setor)
-                    db.session.add(setor_obj)
-                    db.session.commit()
-
-                colab_obj = Colaborador.query.filter_by(nome=nome_colaborador).first()
-                if not colab_obj:
-                    colab_obj = Colaborador(nome=nome_colaborador, setor_id=setor_obj.id)
-                    db.session.add(colab_obj)
-                    db.session.commit()
-                
-                treinamento_obj = Treinamento.query.filter_by(nome=nome_treinamento, colaborador_id=colab_obj.id).first()
-                if not treinamento_obj:
-                    treinamento_obj = Treinamento(
-                        nome=nome_treinamento, 
-                        colaborador_id=colab_obj.id
-                    )
-                    db.session.add(treinamento_obj)
-                    db.session.commit()
-
-            db.session.commit()
-            flash('Planilha importada com sucesso!', 'success')
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Erro ao processar planilha: {str(e)}', 'danger')
-            
-    return redirect(url_for('index'))
+  
+    ws.append(["Colaborador", "Setor", "Treinamento"])
+    ws.append(["Exemplo: João Silva", "Garantia da Qualidade", "Integração ISO 9001"])
+    
+    
+    wb.save(output)
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='modelo_treinamentos.xlsx'
+    )
 
 @app.route('/setor/<int:sid>')
 @login_required
