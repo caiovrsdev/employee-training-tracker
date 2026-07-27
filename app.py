@@ -126,7 +126,7 @@ def baixar_modelo():
         top=Side(style='thin'), bottom=Side(style='thin')
     )
 
-    headers = ["Colaborador", "Setor", "Sigla POP", "Treinamento / Documento", "Data de Realização", "Assinatura"]
+    headers = ["Colaborador", "Setor", "Sigla POP", "Treinamento / Documento", "Data de Realização"]
     ws.append(headers)
     
     for col_num, header in enumerate(headers, 1):
