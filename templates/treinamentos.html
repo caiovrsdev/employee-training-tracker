@@ -305,16 +305,41 @@
     </div>
 </div>
 
+<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                <button type="button" onclick="document.getElementById('modalEditarTreinamento').style.display = 'none';" class="btn-sm" style="padding: 10px 20px; font-size: 14px;">Cancelar</button>
+                <button type="submit" class="btn">Atualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     function abrirModalEditar(btn) {
+        console.log("O botão editar foi clicado!", btn);
+        
+        try {
+            const form = document.getElementById('formEditarTreinamento');
+            const modal = document.getElementById('modalEditarTreinamento');
+            
+            if (!form || !modal) {
+                alert("ERRO: O modal não foi encontrado no HTML!");
+                return;
+            }
 
-    document.getElementById('formEditarTreinamento').action = "/api/treinamento/editar_doc/" + btn.getAttribute('data-id');
-    document.getElementById('edit_sigla_doc').value = btn.getAttribute('data-sigla');
-    document.getElementById('edit_nome').value = btn.getAttribute('data-nome');
-    document.getElementById('edit_departamentos').value = btn.getAttribute('data-deps');
-    document.getElementById('edit_data_aprovacao').value = btn.getAttribute('data-data');
-    
-    document.getElementById('modalEditarTreinamento').style.display = 'block';
-}
+            form.action = "/api/treinamento/editar_doc/" + btn.getAttribute('data-id');
+            document.getElementById('edit_sigla_doc').value = btn.getAttribute('data-sigla') || '';
+            document.getElementById('edit_nome').value = btn.getAttribute('data-nome') || '';
+            document.getElementById('edit_departamentos').value = btn.getAttribute('data-deps') || '';
+            document.getElementById('edit_data_aprovacao').value = btn.getAttribute('data-data') || '';
+            
+            modal.style.display = 'block';
+            console.log("Modal aberto com sucesso!");
+
+        } catch (erro) {
+            console.error("Falha ao abrir modal:", erro);
+            alert("Erro interno no JavaScript! Aperte F12 e olhe a aba 'Console'.");
+        }
+    }
 </script>
+{% endblock %}
 {% endblock %}
