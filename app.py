@@ -1,4 +1,5 @@
 import os
+import io
 import openpyxl
 from flask import send_from_directory
 import traceback
@@ -108,16 +109,14 @@ def treinamentos_page():
 @app.route('/baixar-modelo')
 @login_required
 def baixar_modelo():
-
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Modelo de Treinamentos"
     
-  
     ws.append(["Colaborador", "Setor", "Treinamento"])
     ws.append(["Exemplo: João Silva", "Garantia da Qualidade", "Integração ISO 9001"])
     
-    
+    output = io.BytesIO()
     wb.save(output)
     output.seek(0)
     
@@ -127,41 +126,6 @@ def baixar_modelo():
         as_attachment=True,
         download_name='modelo_treinamentos.xlsx'
     )
-
-@app.route('/setor/<int:sid>')
-@login_required
-def view_setor(sid):
-    try:
-        setor = Setor.query.get_or_404(sid)
-        colaboradores = Colaborador.query.filter_by(setor_id=sid).all()
-
-        treinamentos_unicos = db.session.query(Treinamento.nome).distinct().all()
-        nomes_treinamentos = [t[0] for t in treinamentos_unicos]
-        
-        treinamentos = Treinamento.query.all() 
-        
-        records = []
-        for colab in colaboradores:
-            for t in colab.treinamentos:
-                status = calcular_status_treinamento(t.data_realizacao, t.data_aprovacao)
-                records.append({
-                    "colaborador": colab,
-                    "treinamento": t,
-                    "status": status
-                })
-                
-        return render_template('setor.html', 
-                               setor=setor, 
-                               colaboradores=colaboradores, 
-                               treinamentos=treinamentos,
-                               nomes_treinamentos=nomes_treinamentos,
-                               records=records)
-                               
-    except Exception as e:
-        # Se o Jinja ou o Python quebrarem, essa linha vai cuspir a resposta na tela!
-        erro_completo = traceback.format_exc()
-        return f"<h1>RAIO-X DO ERRO 500:</h1><p>O seu HTML quebrou pelo seguinte motivo:</p><pre style='background:#f4f4f4; padding:20px; border-radius:8px; font-size:14px;'>{erro_completo}</pre>", 500
-
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json(silent=True) or request.form or {}
@@ -185,6 +149,27 @@ def api_register():
     db.session.add(novo_usuario)
     db.session.commit()
     return jsonify({"success": True}), 201
+
+@app.route('/api/treinamento/editar_doc/<int:tid>', methods=['POST'])
+@login_required
+def api_editar_doc_treinamento(tid):
+    t = Treinamento.query.get_or_404(tid)
+    
+    t.sigla_doc = request.form.get('sigla_doc', t.sigla_doc)
+    t.nome = request.form.get('nome', t.nome)
+    t.departamentos = request.form.get('departamentos', t.departamentos)
+    t.data_aprovacao = request.form.get('data_aprovacao', t.data_aprovacao)
+    
+    db.session.commit()
+    return redirect(url_for('treinamentos_page'))
+
+@app.route('/api/treinamento/excluir_doc/<int:tid>', methods=['POST'])
+@login_required
+def api_excluir_doc_treinamento(tid):
+    t = Treinamento.query.get_or_404(tid)
+    db.session.delete(t)
+    db.session.commit()
+    return redirect(url_for('treinamentos_page'))
 
 @app.route('/logout')
 @login_required
