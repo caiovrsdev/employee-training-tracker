@@ -118,7 +118,15 @@
                     <td style="padding: 14px 8px;">{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
                     <td style="padding: 14px 8px;">
     <div style="display: flex; gap: 8px;">
-        <button onclick="abrirModalEditar({{ t.id }}, '{{ t.sigla_doc or '' }}', '{{ t.nome }}', '{{ t.departamentos or '' }}', '{{ t.data_aprovacao or '' }}')" class="btn-sm" style="padding: 4px 10px; font-size: 12px; background: var(--primary); color: #fff; border: none; border-radius: 4px; cursor: pointer;">Editar</button>
+<button type="button" 
+        data-id="{{ t.id }}" 
+        data-sigla="{{ t.sigla_doc or '' }}" 
+        data-nome="{{ t.nome }}" 
+        data-deps="{{ t.departamentos or '' }}" 
+        data-data="{{ t.data_aprovacao or '' }}" 
+        onclick="abrirModalEditar(this)" 
+        class="btn-sm" 
+        style="padding: 4px 10px; font-size: 12px; background: var(--primary); color: #fff; border: none; border-radius: 4px; cursor: pointer;">Editar</button>
         
         <form action="{{ url_for('api_excluir_doc_treinamento', tid=t.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir o documento {{ t.sigla_doc }}? Esta ação não pode ser desfeita.');" style="margin: 0;">
             <button type="submit" class="btn-sm" style="padding: 4px 10px; font-size: 12px; background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Excluir</button>
@@ -298,16 +306,15 @@
 </div>
 
 <script>
-    function abrirModalEditar(id, sigla, nome, departamentos, dataAprovacao) {
+    function abrirModalEditar(btn) {
 
-        document.getElementById('formEditarTreinamento').action = "/api/treinamento/editar_doc/" + id;
-
-        document.getElementById('edit_sigla_doc').value = sigla;
-        document.getElementById('edit_nome').value = nome;
-        document.getElementById('edit_departamentos').value = departamentos;
-        document.getElementById('edit_data_aprovacao').value = dataAprovacao;
-
-        document.getElementById('modalEditarTreinamento').style.display = 'block';
-    }
+    document.getElementById('formEditarTreinamento').action = "/api/treinamento/editar_doc/" + btn.getAttribute('data-id');
+    document.getElementById('edit_sigla_doc').value = btn.getAttribute('data-sigla');
+    document.getElementById('edit_nome').value = btn.getAttribute('data-nome');
+    document.getElementById('edit_departamentos').value = btn.getAttribute('data-deps');
+    document.getElementById('edit_data_aprovacao').value = btn.getAttribute('data-data');
+    
+    document.getElementById('modalEditarTreinamento').style.display = 'block';
+}
 </script>
 {% endblock %}
