@@ -77,6 +77,7 @@
     <div class="table-wrap" style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
+                <th style="padding: 12px 8px;">Ações</th>
                 <tr style="border-bottom: 2px solid var(--border); color: var(--text-dim);">
                     <th style="padding: 12px 8px; position: relative;">
                         <div class="filter-header">
@@ -115,6 +116,15 @@
                     <td style="padding: 14px 8px;"><strong>{{ t.nome }}</strong></td>
                     <td style="padding: 14px 8px;">{{ t.departamentos if t.departamentos else '-' }}</td>
                     <td style="padding: 14px 8px;">{{ t.data_aprovacao if t.data_aprovacao else '-' }}</td>
+                    <td style="padding: 14px 8px;">
+    <div style="display: flex; gap: 8px;">
+        <button onclick="abrirModalEditar({{ t.id }}, '{{ t.sigla_doc or '' }}', '{{ t.nome }}', '{{ t.departamentos or '' }}', '{{ t.data_aprovacao or '' }}')" class="btn-sm" style="padding: 4px 10px; font-size: 12px; background: var(--primary); color: #fff; border: none; border-radius: 4px; cursor: pointer;">Editar</button>
+        
+        <form action="{{ url_for('api_excluir_doc_treinamento', tid=t.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir o documento {{ t.sigla_doc }}? Esta ação não pode ser desfeita.');" style="margin: 0;">
+            <button type="submit" class="btn-sm" style="padding: 4px 10px; font-size: 12px; background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Excluir</button>
+        </form>
+    </div>
+</td>
                 </tr>
                 {% else %}
                 <tr>
@@ -253,5 +263,51 @@
             });
         }
     });
+<div id="modalEditarTreinamento" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background-color: var(--card-bg); margin: 6% auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <h2 style="margin-top: 0; color: var(--primary); font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px;">Editar Documento / Rastreabilidade</h2>
+        
+        <form id="formEditarTreinamento" method="POST" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label>Sigla Doc</label>
+                    <input type="text" id="edit_sigla_doc" name="sigla_doc" required>
+                </div>
+                <div style="flex: 2;">
+                    <label>Nome do Treinamento</label>
+                    <input type="text" id="edit_nome" name="nome" required>
+                </div>
+            </div>
+
+            <div>
+                <label>Departamentos Aplicáveis</label>
+                <input type="text" id="edit_departamentos" name="departamentos" required>
+            </div>
+
+            <div>
+                <label>Data de Aprovação (Revisão)</label>
+                <input type="date" id="edit_data_aprovacao" name="data_aprovacao" required>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                <button type="button" onclick="document.getElementById('modalEditarTreinamento').style.display = 'none';" class="btn-sm" style="padding: 10px 20px; font-size: 14px;">Cancelar</button>
+                <button type="submit" class="btn">Atualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalEditar(id, sigla, nome, departamentos, dataAprovacao) {
+
+        document.getElementById('formEditarTreinamento').action = "/api/treinamento/editar_doc/" + id;
+
+        document.getElementById('edit_sigla_doc').value = sigla;
+        document.getElementById('edit_nome').value = nome;
+        document.getElementById('edit_departamentos').value = departamentos;
+        document.getElementById('edit_data_aprovacao').value = dataAprovacao;
+
+        document.getElementById('modalEditarTreinamento').style.display = 'block';
+    }
 </script>
 {% endblock %}
