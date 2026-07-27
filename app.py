@@ -1,5 +1,6 @@
 import os
 import io
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import openpyxl
 from flask import send_from_directory
 import traceback
@@ -111,11 +112,45 @@ def treinamentos_page():
 def baixar_modelo():
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Modelo de Treinamentos"
+    ws.title = "Controle de Treinamentos"
+
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid") 
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    cell_font = Font(name="Arial", size=10)
     
-    ws.append(["Colaborador", "Setor", "Treinamento"])
-    ws.append(["Exemplo: João Silva", "Garantia da Qualidade", "Integração ISO 9001"])
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    align_left = Alignment(horizontal="left", vertical="center")
     
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'), 
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    headers = ["Colaborador", "Setor", "Sigla POP", "Treinamento / Documento", "Data de Realização", "Assinatura"]
+    ws.append(headers)
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = align_center
+        cell.border = thin_border
+
+    ws.column_dimensions['A'].width = 35 
+    ws.column_dimensions['B'].width = 20 
+    ws.column_dimensions['C'].width = 15 
+    ws.column_dimensions['D'].width = 40 
+    ws.column_dimensions['E'].width = 20 
+    ws.column_dimensions['F'].width = 25 
+    exemplo = ["João Silva", "GQ", "POP-00.01", "Integração e Boas Práticas", "   /   /   ", ""]
+    ws.append(exemplo)
+    
+    for col_num in range(1, 7):
+        cell = ws.cell(row=2, column=col_num)
+        cell.font = cell_font
+        cell.alignment = align_center if col_num in [2, 3, 5] else align_left
+        cell.border = thin_border
+
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -124,7 +159,7 @@ def baixar_modelo():
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name='modelo_treinamentos.xlsx'
+        download_name='Controle_Treinamentos_Ecolyzer.xlsx'
     )
 @app.route('/api/login', methods=['POST'])
 def api_login():
